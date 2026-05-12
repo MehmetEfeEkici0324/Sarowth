@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { assertSupabaseConfig } from "@/lib/supabase/config";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 interface AuthResult {
@@ -11,12 +12,26 @@ function getSiteUrl() {
   return process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 }
 
+function getSupabaseConfigError() {
+  try {
+    assertSupabaseConfig();
+    return null;
+  } catch {
+    return "Supabase env eksik. Vercel Environment Variables alanına NEXT_PUBLIC_SUPABASE_URL ve NEXT_PUBLIC_SUPABASE_ANON_KEY eklenmeli.";
+  }
+}
+
 export async function signInWithEmail(_prevState: AuthResult, formData: FormData): Promise<AuthResult> {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
 
   if (!email || !password) {
     return { error: "Email ve şifre zorunlu." };
+  }
+
+  const configError = getSupabaseConfigError();
+  if (configError) {
+    return { error: configError };
   }
 
   const supabase = await createSupabaseServerClient();
@@ -42,6 +57,11 @@ export async function signUpWithEmail(_prevState: AuthResult, formData: FormData
     return { error: "Şifre en az 8 karakter olmalı." };
   }
 
+  const configError = getSupabaseConfigError();
+  if (configError) {
+    return { error: configError };
+  }
+
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.auth.signUp({
     email,
@@ -60,6 +80,11 @@ export async function signUpWithEmail(_prevState: AuthResult, formData: FormData
 }
 
 export async function signInWithOAuth(provider: "google" | "github") {
+  const configError = getSupabaseConfigError();
+  if (configError) {
+    redirect(`/login?error=${encodeURIComponent(configError)}`);
+  }
+
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider,
@@ -76,6 +101,11 @@ export async function signInWithOAuth(provider: "google" | "github") {
 }
 
 export async function signOut() {
+  const configError = getSupabaseConfigError();
+  if (configError) {
+    redirect("/");
+  }
+
   const supabase = await createSupabaseServerClient();
   await supabase.auth.signOut();
   redirect("/");
