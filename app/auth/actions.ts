@@ -79,27 +79,6 @@ export async function signUpWithEmail(_prevState: AuthResult, formData: FormData
   redirect("/auth/check-email");
 }
 
-export async function signInWithOAuth(provider: "google" | "github") {
-  const configError = getSupabaseConfigError();
-  if (configError) {
-    redirect(`/login?error=${encodeURIComponent(configError)}`);
-  }
-
-  const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider,
-    options: {
-      redirectTo: `${getSiteUrl()}/auth/callback`,
-    },
-  });
-
-  if (error || !data.url) {
-    redirect(`/login?error=${encodeURIComponent("OAuth başlatılamadı.")}`);
-  }
-
-  redirect(data.url);
-}
-
 export async function signOut() {
   const configError = getSupabaseConfigError();
   if (configError) {

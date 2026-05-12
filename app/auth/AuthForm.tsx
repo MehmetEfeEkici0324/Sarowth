@@ -1,8 +1,10 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { Github, Mail } from "lucide-react";
-import { signInWithEmail, signInWithOAuth, signUpWithEmail } from "@/app/auth/actions";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { getSupabaseConfig } from "@/lib/supabase/config";
+import { signInWithEmail, signUpWithEmail } from "@/app/auth/actions";
 
 interface AuthFormProps {
   mode: "login" | "signup";
@@ -12,9 +14,32 @@ interface AuthFormProps {
 const initialState = { error: undefined };
 
 export function AuthForm({ mode, error }: AuthFormProps) {
+  const [oauthError, setOauthError] = useState<string | null>(null);
   const isSignup = mode === "signup";
   const action = isSignup ? signUpWithEmail : signInWithEmail;
   const [state, formAction, isPending] = useActionState(action, { error });
+
+  async function handleOAuth(provider: "google" | "github") {
+    setOauthError(null);
+
+    const config = getSupabaseConfig();
+    if (!config.isConfigured) {
+      setOauthError("Supabase env eksik.");
+      return;
+    }
+
+    const supabase = createSupabaseBrowserClient();
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
+
+    if (error) {
+      setOauthError("OAuth başlatılamadı.");
+    }
+  }
 
   return (
     <div className="w-full max-w-md rounded-[2rem] border border-white/10 bg-white/[0.05] p-6 shadow-[0_0_60px_rgba(16,185,129,0.08)] backdrop-blur-xl">
@@ -25,17 +50,15 @@ export function AuthForm({ mode, error }: AuthFormProps) {
       </p>
 
       <div className="mt-6 grid grid-cols-2 gap-3">
-        <form action={() => signInWithOAuth("google")}>
-          <button type="submit" className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white transition hover:bg-white/10">
-            <Mail size={17} /> Google
-          </button>
-        </form>
-        <form action={() => signInWithOAuth("github")}>
-          <button type="submit" className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white transition hover:bg-white/10">
-            <Github size={17} /> Github
-          </button>
-        </form>
+        <button type="button" onClick={() => handleOAuth("google")} className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white transition hover:bg-white/10">
+          <Mail size={17} /> Google
+        </button>
+        <button type="button" onClick={() => handleOAuth("github")} className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white transition hover:bg-white/10">
+          <Github size={17} /> Github
+        </button>
       </div>
+
+      {oauthError ? <p className="mt-3 rounded-2xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm text-red-200">{oauthError}</p> : null}
 
       <div className="my-6 flex items-center gap-3 text-xs uppercase tracking-[0.2em] text-slate-500">
         <span className="h-px flex-1 bg-white/10" /> Email <span className="h-px flex-1 bg-white/10" />
