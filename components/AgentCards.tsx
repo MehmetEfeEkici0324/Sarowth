@@ -17,24 +17,24 @@ interface AgentCardData {
 const agents: AgentCardData[] = [
   {
     title: "The Guardian",
-    subtitle: "Defensive AI Agent",
-    description: "Audits spending patterns, converts waste into available cycle capital, and proposes budget-safe recipes before cash leaks happen.",
+    subtitle: "Spending clarity",
+    description: "Finds the quiet leaks in your budget and shows which cuts actually create useful test capital.",
     icon: <ShieldCheck size={28} />,
     tone: "emerald",
     signals: [
-      { label: "Food waste cut", value: "-22%", icon: <Utensils size={16} /> },
-      { label: "Cycle capital freed", value: "$184", icon: <WalletCards size={16} /> },
-      { label: "Risk alerts", value: "3", icon: <Zap size={16} /> },
+      { label: "Waste reduced", value: "-22%", icon: <Utensils size={16} /> },
+      { label: "Capital freed", value: "$184", icon: <WalletCards size={16} /> },
+      { label: "Watch items", value: "3", icon: <Zap size={16} /> },
     ],
   },
   {
     title: "The Hunter",
-    subtitle: "Offensive AI Agent",
-    description: "Scans viral demand, supplier gaps, social momentum, and margin windows to build ecommerce plays from newly freed capital.",
+    subtitle: "Product validation",
+    description: "Turns product hunches into a shortlist by comparing demand, margin, audience fit and launch risk.",
     icon: <Target size={28} />,
     tone: "blue",
     signals: [
-      { label: "Viral products", value: "14", icon: <Bot size={16} /> },
+      { label: "Tracked products", value: "14", icon: <Bot size={16} /> },
       { label: "Best margin", value: "41%", icon: <WalletCards size={16} /> },
       { label: "Launch score", value: "92", icon: <Zap size={16} /> },
     ],
@@ -45,9 +45,9 @@ export function AgentCards({ className }: AgentCardsProps) {
   return (
     <section id="agents" className={cn("mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:py-28", className)}>
       <div className="mx-auto max-w-3xl text-center">
-        <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-300">Dual-Agent Interface</p>
-        <h2 className="mt-4 text-4xl font-semibold tracking-[-0.04em] text-white sm:text-6xl">One cycle. Two autonomous minds.</h2>
-        <p className="mt-5 text-lg leading-8 text-slate-300">Sarowth turns financial defense into entrepreneurial offense: reduce leakage, fund experiments, reinvest the wins.</p>
+        <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-300">How it works</p>
+        <h2 className="mt-4 text-4xl font-semibold tracking-[-0.04em] text-white sm:text-6xl">Protect cash first. Test products second.</h2>
+        <p className="mt-5 text-lg leading-8 text-slate-300">The product is built around one practical loop: understand your budget, reserve a small amount, test a product idea, then review the result.</p>
       </div>
 
       <div className="mt-12 grid gap-6 lg:grid-cols-2">

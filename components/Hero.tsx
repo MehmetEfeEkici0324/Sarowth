@@ -9,17 +9,17 @@ interface HeroProps {
 }
 
 const trends = [
-  "Portable Blender - Demand: +450%",
-  "AI Study Lamp - Margin: 38%",
-  "Desk Treadmill - Trend velocity: 7.8x",
-  "Cold Brew Kit - Social lift: +212%",
-  "Smart Pet Feeder - CPC drop: -19%",
-  "Pocket Projector - Supplier spread: 24%",
+  "Portable blender · demand rising",
+  "Desk treadmill · stronger margins",
+  "Cold brew kit · seasonal lift",
+  "Smart pet feeder · cheaper clicks",
+  "Pocket projector · supplier gap",
+  "Travel steamer · repeat search volume",
 ];
 
 export function Hero({
-  headline = "Don't Just Save. Scale.",
-  subtext = "Turn disciplined savings into ecommerce opportunity cycles with autonomous agents that detect waste, capture margin, and compound micro-venture capital.",
+  headline = "Build a business from the money you already have.",
+  subtext = "Sarowth helps you spot wasted spending, protect small pockets of cash and turn them into measured ecommerce experiments without guessing your way through the process.",
 }: HeroProps) {
   return (
     <section id="top" className="relative overflow-hidden px-5 pb-20 pt-16 sm:px-8 lg:pb-28 lg:pt-24">
@@ -31,10 +31,10 @@ export function Hero({
         <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }}>
           <div className="mb-6 flex flex-wrap items-center gap-3">
             <div className="inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-4 py-2 text-sm text-emerald-200 shadow-[0_0_30px_rgba(16,185,129,0.12)]">
-              <Sparkles size={16} /> Autonomous wealth-cycle engine
+              <Sparkles size={16} /> Personal finance, connected to product testing
             </div>
             <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-slate-300 backdrop-blur-xl">
-              Sarowth'a Hoşgeldiniz
+              Private beta
             </div>
           </div>
           <h1 className="max-w-4xl text-5xl font-semibold tracking-[-0.06em] text-white sm:text-7xl lg:text-8xl">
@@ -44,11 +44,11 @@ export function Hero({
 
           <div className="mt-9 flex flex-col gap-4 sm:flex-row">
             <a href="/signup" className="group inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-emerald-400 to-blue-500 px-7 py-4 font-semibold text-[#03110c] shadow-[0_0_36px_rgba(16,185,129,0.24)] transition hover:scale-[1.02]">
-              Launch Your Agent
+              Start with a code
               <ArrowRight className="transition group-hover:translate-x-1" size={18} />
             </a>
             <a href="#tracker" className="inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-7 py-4 font-semibold text-white backdrop-blur-xl transition hover:bg-white/10">
-              Watch live arbitrage
+              Explore the tracker
             </a>
           </div>
         </motion.div>
@@ -58,24 +58,24 @@ export function Hero({
           <div className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.05] p-5 shadow-2xl backdrop-blur-xl">
             <div className="flex items-center justify-between border-b border-white/10 pb-4">
               <div>
-                <p className="text-sm text-slate-400">Cycle capital</p>
+                <p className="text-sm text-slate-400">Available cycle capital</p>
                 <p className="text-3xl font-semibold text-white">$4,280</p>
               </div>
               <div className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-sm text-emerald-200">Live</div>
             </div>
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
-              <MetricCard icon={<Activity size={18} />} label="Waste reduced" value="18.4%" tone="emerald" />
-              <MetricCard icon={<TrendingUp size={18} />} label="Margin found" value="$742" tone="blue" />
+              <MetricCard icon={<Activity size={18} />} label="Monthly leakage" value="-18%" tone="emerald" />
+              <MetricCard icon={<TrendingUp size={18} />} label="Test budget" value="$742" tone="blue" />
             </div>
             <div className="mt-5 rounded-3xl border border-white/10 bg-black/30 p-4">
               <div className="mb-4 flex items-center gap-3">
                 <Bot className="text-emerald-300" size={20} />
-                <p className="font-medium text-white">Agent cycle</p>
+                <p className="font-medium text-white">This week&apos;s cycle</p>
               </div>
               {[
-                ["Saved from grocery drift", "$84"],
-                ["Supplier spread identified", "31%"],
-                ["Pilot ad budget queued", "$120"],
+                ["Unused subscriptions paused", "$42"],
+                ["Product margin to validate", "31%"],
+                ["Small test budget reserved", "$120"],
               ].map(([label, value]) => (
                 <div key={label} className="flex items-center justify-between border-t border-white/10 py-3 text-sm">
                   <span className="text-slate-300">{label}</span>
