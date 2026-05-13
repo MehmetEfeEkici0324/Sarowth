@@ -1,6 +1,13 @@
+import type { Metadata } from "next";
 import { AuthForm } from "@/app/auth/AuthForm";
 
 interface SignupPageProps {}
+
+export const metadata: Metadata = {
+  title: "Create Account",
+  description: "Create a Sarowth account with email verification and start your budget-to-business workspace.",
+  robots: { index: false, follow: false },
+};
 
 export default function SignupPage({}: SignupPageProps) {
   return (

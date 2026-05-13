@@ -1,10 +1,19 @@
-import { Github, Mail } from "lucide-react";
+import type { Metadata } from "next";
+import { Mail } from "lucide-react";
 import { AgentCards } from "@/components/AgentCards";
 import { Footer } from "@/components/Footer";
 import { Hero } from "@/components/Hero";
 import { Navbar } from "@/components/Navbar";
 
 interface HomePageProps {}
+
+export const metadata: Metadata = {
+  title: "Sarowth | Budget Smarter, Build Leaner",
+  description: "Sarowth helps you protect everyday savings, track your budget and validate ecommerce product ideas before spending real money.",
+  alternates: {
+    canonical: "/",
+  },
+};
 
 export default function HomePage({}: HomePageProps) {
   return (
@@ -58,20 +67,14 @@ function AuthPreview() {
   return (
     <section className="px-5 py-20 sm:px-8 lg:py-28">
       <div className="mx-auto max-w-md rounded-[2rem] border border-white/10 bg-white/[0.05] p-6 shadow-[0_0_60px_rgba(16,185,129,0.08)] backdrop-blur-xl">
-        <p className="text-center text-sm font-semibold uppercase tracking-[0.3em] text-emerald-300">Passwordless access</p>
-        <h2 className="mt-3 text-center text-3xl font-semibold tracking-[-0.04em] text-white">Create a workspace in under a minute</h2>
-        <div className="mt-6 grid grid-cols-2 gap-3">
-          <a href="/login" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white transition hover:bg-white/10">
-            <Mail size={17} /> Google
-          </a>
-          <a href="/login" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-white transition hover:bg-white/10">
-            <Github size={17} /> Github
-          </a>
-        </div>
+        <p className="text-center text-sm font-semibold uppercase tracking-[0.3em] text-emerald-300">Email verification</p>
+        <h2 className="mt-3 text-center text-3xl font-semibold tracking-[-0.04em] text-white">Create a workspace with email</h2>
         <form action="/signup" className="mt-5 grid gap-3">
-          <input type="email" placeholder="Email" className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none transition placeholder:text-slate-500 focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-400/10" />
+          <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-slate-400">
+            <Mail size={17} /> We send a verification code first
+          </div>
           <button type="submit" className="mt-2 rounded-2xl bg-gradient-to-r from-emerald-400 to-blue-500 px-5 py-3 font-semibold text-[#03110c] transition hover:scale-[1.01]">
-            Send me a code
+            Create account with email
           </button>
         </form>
       </div>

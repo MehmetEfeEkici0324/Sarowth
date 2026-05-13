@@ -23,9 +23,10 @@ function getSupabaseConfigError() {
 
 export async function signInWithEmail(_prevState: AuthResult, formData: FormData): Promise<AuthResult> {
   const email = String(formData.get("email") ?? "").trim();
+  const password = String(formData.get("password") ?? "");
 
-  if (!email) {
-    return { error: "Enter your email address." };
+  if (!email || !password) {
+    return { error: "Enter your email and password." };
   }
 
   const configError = getSupabaseConfigError();
@@ -34,27 +35,26 @@ export async function signInWithEmail(_prevState: AuthResult, formData: FormData
   }
 
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.auth.signInWithOtp({
-    email,
-    options: {
-      emailRedirectTo: `${getSiteUrl()}/auth/callback`,
-      shouldCreateUser: false,
-    },
-  });
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
-    return { error: "We could not send a login code. Check the email or create an account first." };
+    return { error: "Email, password or verification status is incorrect." };
   }
 
-  redirect(`/auth/verify?email=${encodeURIComponent(email)}&flow=login`);
+  redirect("/dashboard");
 }
 
 export async function signUpWithEmail(_prevState: AuthResult, formData: FormData): Promise<AuthResult> {
   const email = String(formData.get("email") ?? "").trim();
   const fullName = String(formData.get("fullName") ?? "").trim();
+  const password = String(formData.get("password") ?? "");
 
-  if (!email || !fullName) {
-    return { error: "Enter your name and email address." };
+  if (!email || !fullName || !password) {
+    return { error: "Enter your name, email and password." };
+  }
+
+  if (password.length < 8) {
+    return { error: "Password must be at least 8 characters." };
   }
 
   const configError = getSupabaseConfigError();
@@ -63,12 +63,12 @@ export async function signUpWithEmail(_prevState: AuthResult, formData: FormData
   }
 
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.auth.signInWithOtp({
+  const { error } = await supabase.auth.signUp({
     email,
+    password,
     options: {
       data: { full_name: fullName },
       emailRedirectTo: `${getSiteUrl()}/auth/callback`,
-      shouldCreateUser: true,
     },
   });
 
@@ -97,7 +97,7 @@ export async function verifyEmailCode(_prevState: AuthResult, formData: FormData
   }
 
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase.auth.verifyOtp({ email, token, type: "email" });
+  const { data, error } = await supabase.auth.verifyOtp({ email, token, type: "signup" });
 
   if (error || !data.user) {
     return { error: "That code is invalid or expired." };

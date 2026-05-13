@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { AppShell } from "@/components/AppShell";
 import { FormSubmit } from "@/components/FormSubmit";
 import { StatCard } from "@/components/StatCard";
@@ -5,6 +6,12 @@ import { addBudgetEntry } from "@/app/workspace/actions";
 import { getWorkspace } from "@/lib/auth";
 
 interface BudgetPageProps {}
+
+export const metadata: Metadata = {
+  title: "Budget",
+  description: "Track income, expenses and savings inside your private Sarowth budget workspace.",
+  robots: { index: false, follow: false },
+};
 
 export default async function BudgetPage({}: BudgetPageProps) {
   const { supabase, user } = await getWorkspace();

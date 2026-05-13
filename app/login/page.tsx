@@ -1,8 +1,15 @@
+import type { Metadata } from "next";
 import { AuthForm } from "@/app/auth/AuthForm";
 
 interface LoginPageProps {
   searchParams: Promise<{ error?: string }>;
 }
+
+export const metadata: Metadata = {
+  title: "Login",
+  description: "Sign in to your Sarowth workspace with email and password.",
+  robots: { index: false, follow: false },
+};
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = await searchParams;

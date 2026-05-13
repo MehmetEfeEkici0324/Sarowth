@@ -1,9 +1,16 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { VerifyCodeForm } from "@/app/auth/VerifyCodeForm";
 
 interface VerifyPageProps {
   searchParams: Promise<{ email?: string; flow?: string }>;
 }
+
+export const metadata: Metadata = {
+  title: "Verify Email",
+  description: "Verify your Sarowth account with the email code sent to your inbox.",
+  robots: { index: false, follow: false },
+};
 
 export default async function VerifyPage({ searchParams }: VerifyPageProps) {
   const params = await searchParams;

@@ -1,9 +1,16 @@
+import type { Metadata } from "next";
 import { AppShell } from "@/components/AppShell";
 import { FormSubmit } from "@/components/FormSubmit";
 import { updateProfile } from "@/app/workspace/actions";
 import { getWorkspace } from "@/lib/auth";
 
 interface ProfilePageProps {}
+
+export const metadata: Metadata = {
+  title: "Profile",
+  description: "Manage your private Sarowth profile, savings goal and risk preference.",
+  robots: { index: false, follow: false },
+};
 
 export default async function ProfilePage({}: ProfilePageProps) {
   const { profile, user } = await getWorkspace();

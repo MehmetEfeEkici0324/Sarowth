@@ -1,0 +1,17 @@
+{
+  "name": "Sarowth",
+  "short_name": "Sarowth",
+  "description": "Budget smarter, build leaner and validate ecommerce ideas with Sarowth.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#050505",
+  "theme_color": "#050505",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "128x128",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

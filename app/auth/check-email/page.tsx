@@ -1,4 +1,12 @@
+import type { Metadata } from "next";
+
 interface CheckEmailPageProps {}
+
+export const metadata: Metadata = {
+  title: "Check Email",
+  description: "Check your inbox for your Sarowth verification code.",
+  robots: { index: false, follow: false },
+};
 
 export default function CheckEmailPage({}: CheckEmailPageProps) {
   return (

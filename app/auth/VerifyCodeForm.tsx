@@ -17,7 +17,7 @@ export function VerifyCodeForm({ email, flow }: VerifyCodeFormProps) {
       <p className="text-center text-sm font-semibold uppercase tracking-[0.3em] text-emerald-300">Check your inbox</p>
       <h1 className="mt-3 text-center text-3xl font-semibold tracking-[-0.04em] text-white">Enter the 6-digit code</h1>
       <p className="mt-3 text-center text-sm leading-6 text-slate-400">
-        We sent a one-time {flow === "signup" ? "verification" : "login"} code to <span className="text-slate-200">{email}</span>.
+        We sent a one-time verification code to <span className="text-slate-200">{email}</span>. After verification, you can sign in with your password.
       </p>
       <form action={formAction} className="mt-6 grid gap-3">
         <input type="hidden" name="email" value={email} />

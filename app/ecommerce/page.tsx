@@ -1,9 +1,16 @@
+import type { Metadata } from "next";
 import { AppShell } from "@/components/AppShell";
 import { FormSubmit } from "@/components/FormSubmit";
 import { addEcommerceIdea } from "@/app/workspace/actions";
 import { getWorkspace } from "@/lib/auth";
 
 interface EcommercePageProps {}
+
+export const metadata: Metadata = {
+  title: "Ecommerce Ideas",
+  description: "Track product ideas, demand scores and margin assumptions inside your private Sarowth ecommerce workspace.",
+  robots: { index: false, follow: false },
+};
 
 export default async function EcommercePage({}: EcommercePageProps) {
   const { supabase, user } = await getWorkspace();

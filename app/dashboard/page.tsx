@@ -1,8 +1,15 @@
+import type { Metadata } from "next";
 import { AppShell } from "@/components/AppShell";
 import { StatCard } from "@/components/StatCard";
 import { getWorkspace } from "@/lib/auth";
 
 interface DashboardPageProps {}
+
+export const metadata: Metadata = {
+  title: "Dashboard",
+  description: "Your private Sarowth dashboard for cycle capital, budget signals and ecommerce ideas.",
+  robots: { index: false, follow: false },
+};
 
 export default async function DashboardPage({}: DashboardPageProps) {
   const { supabase, user, profile } = await getWorkspace();
