@@ -6,8 +6,8 @@ interface LoginPageProps {
 }
 
 export const metadata: Metadata = {
-  title: "Login",
-  description: "Sign in to your Sarowth workspace with email and password.",
+  title: "Giriş Yap",
+  description: "Sarowth çalışma alanına e-posta ve şifrenle giriş yap.",
   robots: { index: false, follow: false },
 };
 

@@ -5,10 +5,10 @@ interface FooterProps {
 }
 
 const columns = [
-  { title: "Product", links: ["Agents", "Cycle Engine", "Arbitrage Tracker", "Dashboard"] },
-  { title: "Company", links: ["Vision", "Careers", "Press", "Contact"] },
-  { title: "Resources", links: ["Docs", "API", "Playbooks", "Security"] },
-  { title: "Legal", links: ["Privacy", "Terms", "Compliance", "Risk"] },
+  { title: "Ürün", links: ["Ajanlar", "Döngü Motoru", "Trend Takibi", "Panel"] },
+  { title: "Şirket", links: ["Vizyon", "Kariyer", "Basın", "İletişim"] },
+  { title: "Kaynaklar", links: ["Dokümanlar", "API", "Rehberler", "Güvenlik"] },
+  { title: "Yasal", links: ["Gizlilik", "Şartlar", "Uyumluluk", "Risk"] },
 ];
 
 export function Footer({ year = new Date().getFullYear() }: FooterProps) {
@@ -22,12 +22,12 @@ export function Footer({ year = new Date().getFullYear() }: FooterProps) {
             </span>
             <span className="text-lg font-semibold tracking-[0.28em] text-white">SAROWTH</span>
           </div>
-          <p className="mt-5 max-w-sm leading-7 text-slate-400">Save with discipline. Grow with agents. Compound every financial cycle into a smarter venture loop.</p>
+          <p className="mt-5 max-w-sm leading-7 text-slate-400">Disiplinli birikim yap. Fikirlerini ölçülü test et. Her finansal döngüyü daha akıllı bir büyüme adımına çevir.</p>
           <form className="mt-7 flex max-w-md overflow-hidden rounded-full border border-white/10 bg-white/[0.04] p-1 backdrop-blur-xl">
-            <label className="sr-only" htmlFor="alpha-email">Email address</label>
-            <input id="alpha-email" type="email" placeholder="Join the Alpha" className="min-w-0 flex-1 bg-transparent px-5 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:ring-0" />
+            <label className="sr-only" htmlFor="alpha-email">E-posta adresi</label>
+            <input id="alpha-email" type="email" placeholder="Erken erişime katıl" className="min-w-0 flex-1 bg-transparent px-5 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:ring-0" />
             <button type="submit" className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-semibold text-black transition hover:bg-emerald-200">
-              <Send size={16} /> Join
+              <Send size={16} /> Katıl
             </button>
           </form>
         </div>
@@ -49,10 +49,10 @@ export function Footer({ year = new Date().getFullYear() }: FooterProps) {
       </div>
 
       <div className="mx-auto mt-12 flex max-w-7xl flex-col gap-5 border-t border-white/10 pt-8 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
-        <p>© {year} Sarowth. Built for autonomous wealth cycles.</p>
+        <p>© {year} Sarowth. Bütçeden işe giden daha net döngüler için geliştirildi.</p>
         <div className="flex items-center gap-3">
           {[Twitter, Github, Linkedin].map((Icon, index) => (
-            <a key={index} href="#top" className="grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-white/[0.04] text-slate-300 transition hover:border-emerald-400/40 hover:text-white" aria-label="Social profile">
+            <a key={index} href="#top" className="grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-white/[0.04] text-slate-300 transition hover:border-emerald-400/40 hover:text-white" aria-label="Sosyal profil">
               <Icon size={18} />
             </a>
           ))}

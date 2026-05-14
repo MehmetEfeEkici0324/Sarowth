@@ -23,19 +23,19 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://sarowth.com";
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "Sarowth | Budget Smarter, Build Leaner",
+    default: "Sarowth | Bütçeni Koru, Fikrini Test Et",
     template: "%s | Sarowth",
   },
-  description: "Sarowth helps people turn everyday savings into careful ecommerce experiments with budget tracking, product validation and a clear growth workspace.",
+  description: "Sarowth, günlük birikimlerini koruyup kontrollü e-ticaret denemelerine dönüştürmen için bütçe takibi, ürün doğrulama ve sade bir çalışma alanı sunar.",
   keywords: [
     "Sarowth",
-    "Save and Growth",
-    "budget tracker",
-    "ecommerce validation",
-    "personal finance app",
-    "startup budget planner",
-    "product idea tracker",
-    "micro business finance",
+    "tasarruf ve büyüme",
+    "bütçe takip uygulaması",
+    "e-ticaret ürün doğrulama",
+    "kişisel finans uygulaması",
+    "girişim bütçe planlayıcı",
+    "ürün fikri takip",
+    "mikro girişim finansı",
   ],
   authors: [{ name: "Sarowth" }],
   creator: "Sarowth",
@@ -55,24 +55,24 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
   openGraph: {
     type: "website",
-    locale: "en_US",
+    locale: "tr_TR",
     url: "/",
     siteName: "Sarowth",
-    title: "Sarowth | Budget Smarter, Build Leaner",
-    description: "A calm workspace for protecting cash, validating ecommerce ideas and building from the money you already have.",
+    title: "Sarowth | Bütçeni Koru, Fikrini Test Et",
+    description: "Paranı korumak, e-ticaret fikirlerini doğrulamak ve elindeki bütçeyle daha bilinçli ilerlemek için sade bir çalışma alanı.",
     images: [
       {
         url: "/og-image.svg",
         width: 1200,
         height: 630,
-        alt: "Sarowth workspace preview",
+        alt: "Sarowth çalışma alanı önizlemesi",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Sarowth | Budget Smarter, Build Leaner",
-    description: "Turn everyday savings into careful ecommerce experiments with Sarowth.",
+    title: "Sarowth | Bütçeni Koru, Fikrini Test Et",
+    description: "Günlük birikimlerini Sarowth ile kontrollü e-ticaret denemelerine dönüştür.",
     images: ["/og-image.svg"],
   },
   robots: {
@@ -91,7 +91,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
-    <html lang="en">
+    <html lang="tr">
       <head>
         <script
           type="application/ld+json"
@@ -103,7 +103,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
               applicationCategory: "FinanceApplication",
               operatingSystem: "Web",
               url: siteUrl,
-              description: "Sarowth helps people turn everyday savings into careful ecommerce experiments with budget tracking, product validation and a clear growth workspace.",
+              description: "Sarowth, günlük birikimlerini koruyup kontrollü e-ticaret denemelerine dönüştürmen için bütçe takibi, ürün doğrulama ve sade bir çalışma alanı sunar.",
               offers: {
                 "@type": "Offer",
                 price: "0",

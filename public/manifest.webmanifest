@@ -1,7 +1,7 @@
 {
   "name": "Sarowth",
   "short_name": "Sarowth",
-  "description": "Budget smarter, build leaner and validate ecommerce ideas with Sarowth.",
+  "description": "Sarowth ile bütçeni koru, ürün fikirlerini doğrula ve daha bilinçli ilerle.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#050505",

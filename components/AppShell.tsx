@@ -8,10 +8,10 @@ interface AppShellProps {
 }
 
 const navItems = [
-  { label: "Overview", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Budget", href: "/budget", icon: WalletCards },
-  { label: "Ecommerce", href: "/ecommerce", icon: BriefcaseBusiness },
-  { label: "Profile", href: "/profile", icon: UserRound },
+  { label: "Genel Bakış", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Bütçem", href: "/budget", icon: WalletCards },
+  { label: "E-Ticaret", href: "/ecommerce", icon: BriefcaseBusiness },
+  { label: "Profil", href: "/profile", icon: UserRound },
 ];
 
 export function AppShell({ title, subtitle, children }: AppShellProps) {
@@ -35,14 +35,14 @@ export function AppShell({ title, subtitle, children }: AppShellProps) {
           </nav>
           <form action={signOut} className="mt-6 border-t border-white/10 pt-4">
             <button type="submit" className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-sm text-slate-300 transition hover:bg-white/10 hover:text-white">
-              <LogOut size={18} /> Sign out
+              <LogOut size={18} /> Çıkış Yap
             </button>
           </form>
         </aside>
 
         <section className="min-w-0">
           <div className="mb-6 rounded-[2rem] border border-white/10 bg-white/[0.05] p-6 backdrop-blur-xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-300">Workspace</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-300">Çalışma Alanı</p>
             <h1 className="mt-3 text-4xl font-semibold tracking-[-0.04em] sm:text-5xl">{title}</h1>
             <p className="mt-3 max-w-2xl leading-7 text-slate-400">{subtitle}</p>
           </div>

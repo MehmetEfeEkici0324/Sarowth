@@ -7,8 +7,8 @@ interface VerifyPageProps {
 }
 
 export const metadata: Metadata = {
-  title: "Verify Email",
-  description: "Verify your Sarowth account with the email code sent to your inbox.",
+  title: "E-posta Doğrula",
+  description: "Gelen kutuna gönderilen kodla Sarowth hesabını doğrula.",
   robots: { index: false, follow: false },
 };
 

@@ -7,7 +7,7 @@ interface FormSubmitProps {
   pendingLabel?: string;
 }
 
-export function FormSubmit({ idleLabel, pendingLabel = "Saving..." }: FormSubmitProps) {
+export function FormSubmit({ idleLabel, pendingLabel = "Kaydediliyor..." }: FormSubmitProps) {
   const { pending } = useFormStatus();
 
   return (

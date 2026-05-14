@@ -16,27 +16,27 @@ interface AgentCardData {
 
 const agents: AgentCardData[] = [
   {
-    title: "The Guardian",
-    subtitle: "Spending clarity",
-    description: "Finds the quiet leaks in your budget and shows which cuts actually create useful test capital.",
+    title: "Koruyucu",
+    subtitle: "Harcama netliği",
+    description: "Bütçendeki sessiz kaçakları bulur ve hangi kesintilerin gerçekten işe yarar test sermayesi oluşturduğunu gösterir.",
     icon: <ShieldCheck size={28} />,
     tone: "emerald",
     signals: [
-      { label: "Waste reduced", value: "-22%", icon: <Utensils size={16} /> },
-      { label: "Capital freed", value: "$184", icon: <WalletCards size={16} /> },
-      { label: "Watch items", value: "3", icon: <Zap size={16} /> },
+      { label: "İsraf azaldı", value: "-22%", icon: <Utensils size={16} /> },
+      { label: "Ayrılan sermaye", value: "$184", icon: <WalletCards size={16} /> },
+      { label: "Takip maddesi", value: "3", icon: <Zap size={16} /> },
     ],
   },
   {
-    title: "The Hunter",
-    subtitle: "Product validation",
-    description: "Turns product hunches into a shortlist by comparing demand, margin, audience fit and launch risk.",
+    title: "Avcı",
+    subtitle: "Ürün doğrulama",
+    description: "Ürün fikirlerini talep, marj, hedef kitle uyumu ve lansman riskiyle karşılaştırarak net bir kısa listeye dönüştürür.",
     icon: <Target size={28} />,
     tone: "blue",
     signals: [
-      { label: "Tracked products", value: "14", icon: <Bot size={16} /> },
-      { label: "Best margin", value: "41%", icon: <WalletCards size={16} /> },
-      { label: "Launch score", value: "92", icon: <Zap size={16} /> },
+      { label: "Takip edilen ürün", value: "14", icon: <Bot size={16} /> },
+      { label: "En iyi marj", value: "41%", icon: <WalletCards size={16} /> },
+      { label: "Lansman skoru", value: "92", icon: <Zap size={16} /> },
     ],
   },
 ];
@@ -45,9 +45,9 @@ export function AgentCards({ className }: AgentCardsProps) {
   return (
     <section id="agents" className={cn("mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:py-28", className)}>
       <div className="mx-auto max-w-3xl text-center">
-        <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-300">How it works</p>
-        <h2 className="mt-4 text-4xl font-semibold tracking-[-0.04em] text-white sm:text-6xl">Protect cash first. Test products second.</h2>
-        <p className="mt-5 text-lg leading-8 text-slate-300">The product is built around one practical loop: understand your budget, reserve a small amount, test a product idea, then review the result.</p>
+        <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-300">Nasıl çalışır</p>
+        <h2 className="mt-4 text-4xl font-semibold tracking-[-0.04em] text-white sm:text-6xl">Önce paranı koru. Sonra ürünü test et.</h2>
+        <p className="mt-5 text-lg leading-8 text-slate-300">Sarowth tek bir pratik döngü üzerine kurulu: bütçeni anla, küçük bir tutar ayır, ürün fikrini test et ve sonucu değerlendir.</p>
       </div>
 
       <div className="mt-12 grid gap-6 lg:grid-cols-2">

@@ -16,7 +16,7 @@ function getSupabaseConfigError() {
     assertSupabaseConfig();
     return null;
   } catch {
-    return "Supabase env eksik. Vercel Environment Variables alanına NEXT_PUBLIC_SUPABASE_URL ve NEXT_PUBLIC_SUPABASE_ANON_KEY eklenmeli.";
+    return "Supabase ortam değişkenleri eksik. Vercel Environment Variables alanına NEXT_PUBLIC_SUPABASE_URL ve NEXT_PUBLIC_SUPABASE_ANON_KEY eklenmeli.";
   }
 }
 
@@ -25,7 +25,7 @@ export async function signInWithEmail(_prevState: AuthResult, formData: FormData
   const password = String(formData.get("password") ?? "");
 
   if (!email || !password) {
-    return { error: "Enter your email and password." };
+    return { error: "E-posta ve şifreni gir." };
   }
 
   const configError = getSupabaseConfigError();
@@ -37,7 +37,7 @@ export async function signInWithEmail(_prevState: AuthResult, formData: FormData
   const { error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
-    return { error: "Email, password or verification status is incorrect." };
+    return { error: "E-posta, şifre veya doğrulama durumu hatalı." };
   }
 
   redirect("/dashboard");
@@ -45,11 +45,11 @@ export async function signInWithEmail(_prevState: AuthResult, formData: FormData
 
 function getAdminConfigError() {
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    return "SUPABASE_SERVICE_ROLE_KEY is missing.";
+    return "SUPABASE_SERVICE_ROLE_KEY eksik.";
   }
 
   if (!process.env.EMAIL_CODE_SECRET && !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    return "EMAIL_CODE_SECRET is missing.";
+    return "EMAIL_CODE_SECRET eksik.";
   }
 
   return null;
@@ -75,13 +75,13 @@ async function storeAndSendVerificationCode(userId: string, email: string, fullN
   });
 
   if (insertError) {
-    return { error: "Verification code could not be saved." };
+    return { error: "Doğrulama kodu kaydedilemedi." };
   }
 
   const mail = await sendVerificationCode({ to: email, code, fullName });
 
   if (!mail.ok) {
-    return { error: `Verification email could not be sent: ${mail.error}` };
+    return { error: `Doğrulama e-postası gönderilemedi: ${mail.error}` };
   }
 
   return {};
@@ -93,11 +93,11 @@ export async function signUpWithEmail(_prevState: AuthResult, formData: FormData
   const password = String(formData.get("password") ?? "");
 
   if (!email || !fullName || !password) {
-    return { error: "Enter your name, email and password." };
+    return { error: "Ad soyad, e-posta ve şifre gir." };
   }
 
   if (password.length < 8) {
-    return { error: "Password must be at least 8 characters." };
+    return { error: "Şifre en az 8 karakter olmalı." };
   }
 
   const configError = getSupabaseConfigError();
@@ -121,7 +121,7 @@ export async function signUpWithEmail(_prevState: AuthResult, formData: FormData
   });
 
   if (error || !data.user) {
-    return { error: "Account could not be created. This email may already be registered." };
+    return { error: "Hesap oluşturulamadı. Bu e-posta zaten kayıtlı olabilir." };
   }
 
   await supabaseAdmin.from("profiles").upsert({
@@ -144,11 +144,11 @@ export async function verifyEmailCode(_prevState: AuthResult, formData: FormData
   const token = String(formData.get("token") ?? "").replace(/\s/g, "");
 
   if (!email || !token) {
-    return { error: "Enter the code we sent to your email." };
+    return { error: "E-postana gönderdiğimiz kodu gir." };
   }
 
   if (!/^\d{6}$/.test(token)) {
-    return { error: "The code must be 6 digits." };
+    return { error: "Kod 6 haneli olmalı." };
   }
 
   const configError = getSupabaseConfigError();
@@ -174,11 +174,11 @@ export async function verifyEmailCode(_prevState: AuthResult, formData: FormData
     .single();
 
   if (codeError || !codeRow) {
-    return { error: "That code is invalid or expired." };
+    return { error: "Bu kod geçersiz veya süresi dolmuş." };
   }
 
   if (new Date(codeRow.expires_at).getTime() < Date.now()) {
-    return { error: "That code has expired. Request a new code." };
+    return { error: "Kodun süresi dolmuş. Yeni kod iste." };
   }
 
   const { data: updatedUser, error: updateError } = await supabaseAdmin.auth.admin.updateUserById(codeRow.user_id, {
@@ -186,7 +186,7 @@ export async function verifyEmailCode(_prevState: AuthResult, formData: FormData
   });
 
   if (updateError || !updatedUser.user) {
-    return { error: "Account could not be verified. Try again." };
+    return { error: "Hesap doğrulanamadı. Tekrar dene." };
   }
 
   await supabaseAdmin.from("email_verification_codes").update({ consumed_at: new Date().toISOString() }).eq("id", codeRow.id);
@@ -204,7 +204,7 @@ export async function resendVerificationCode(_prevState: AuthResult, formData: F
   const email = String(formData.get("email") ?? "").trim();
 
   if (!email) {
-    return { error: "Email address is missing." };
+    return { error: "E-posta adresi eksik." };
   }
 
   const configError = getSupabaseConfigError();
@@ -221,7 +221,7 @@ export async function resendVerificationCode(_prevState: AuthResult, formData: F
   const { data: profile, error: profileError } = await supabaseAdmin.from("profiles").select("id, full_name").eq("email", email).single();
 
   if (profileError || !profile) {
-    return { error: "We could not find an account waiting for verification." };
+    return { error: "Doğrulama bekleyen bir hesap bulunamadı." };
   }
 
   return storeAndSendVerificationCode(profile.id, email, profile.full_name ?? undefined);

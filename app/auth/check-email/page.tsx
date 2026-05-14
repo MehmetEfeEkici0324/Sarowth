@@ -3,8 +3,8 @@ import type { Metadata } from "next";
 interface CheckEmailPageProps {}
 
 export const metadata: Metadata = {
-  title: "Check Email",
-  description: "Check your inbox for your Sarowth verification code.",
+  title: "E-postanı Kontrol Et",
+  description: "Sarowth doğrulama kodu için gelen kutunu kontrol et.",
   robots: { index: false, follow: false },
 };
 
@@ -12,10 +12,10 @@ export default function CheckEmailPage({}: CheckEmailPageProps) {
   return (
     <main className="grid min-h-screen place-items-center bg-[#050505] px-5 py-12 text-white">
       <div className="max-w-md rounded-[2rem] border border-white/10 bg-white/[0.05] p-8 text-center backdrop-blur-xl">
-        <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-300">Verify</p>
-        <h1 className="mt-3 text-3xl font-semibold">Check your email</h1>
-        <p className="mt-4 leading-7 text-slate-400">Use the code we sent to finish sign-up. If this page appears after an older email link, start again and request a fresh code.</p>
-        <a href="/signup" className="mt-7 inline-flex rounded-full bg-gradient-to-r from-emerald-400 to-blue-500 px-6 py-3 font-semibold text-[#03110c]">Request a new code</a>
+        <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-300">Doğrulama</p>
+        <h1 className="mt-3 text-3xl font-semibold">E-postanı kontrol et</h1>
+        <p className="mt-4 leading-7 text-slate-400">Kaydı tamamlamak için gönderdiğimiz kodu kullan. Eski bir bağlantıdan geldiysen yeniden kayıt ekranına dönüp yeni kod iste.</p>
+        <a href="/signup" className="mt-7 inline-flex rounded-full bg-gradient-to-r from-emerald-400 to-blue-500 px-6 py-3 font-semibold text-[#03110c]">Yeni kod iste</a>
       </div>
     </main>
   );
