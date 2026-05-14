@@ -31,12 +31,9 @@ export default async function DashboardPage({}: DashboardPageProps) {
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <section className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl">
-          <h2 className="text-2xl font-semibold tracking-[-0.03em]">Hızlı yönlendirme</h2>
-          <div className="mt-5 grid gap-3">
-            <a href="/" className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 p-4 font-medium text-emerald-100 transition hover:bg-emerald-400/15">Kişiselleştirilmiş ana sayfaya git</a>
-            <a href="/budget" className="rounded-2xl border border-white/10 bg-black/25 p-4 text-slate-300 transition hover:bg-white/10">Bütçe kayıtlarını düzenle</a>
-            <a href="/ecommerce" className="rounded-2xl border border-white/10 bg-black/25 p-4 text-slate-300 transition hover:bg-white/10">Ürün fikirlerini yönet</a>
-          </div>
+          <h2 className="text-2xl font-semibold tracking-[-0.03em]">Panel durumu</h2>
+          <p className="mt-4 leading-7 text-slate-400">Bu panel yalnızca kısa özet için tutulur. Agent akışı, haberler, banka analizi ve Gemini asistan giriş yaptıktan sonra ana sayfada gösterilir.</p>
+          <a href="/" className="mt-5 inline-flex rounded-full border border-emerald-400/20 bg-emerald-400/10 px-5 py-3 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-400/15">Ana sayfaya dön</a>
         </section>
 
         <section className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl">
@@ -47,7 +44,7 @@ export default async function DashboardPage({}: DashboardPageProps) {
                 <p className="font-medium text-white">{idea.product_name}</p>
                 <p className="mt-2 text-sm text-slate-400">Talep {idea.demand_score}/100 · Marj %{Number(idea.estimated_margin)}</p>
               </div>
-            )) : <p className="rounded-2xl border border-white/10 bg-black/25 p-4 leading-7 text-slate-400">Henüz ürün fikri yok. İlk fikrini E-Ticaret sayfasından ekleyebilirsin.</p>}
+            )) : <p className="rounded-2xl border border-white/10 bg-black/25 p-4 leading-7 text-slate-400">Henüz agent tarafından getirilen ürün fikri yok. Piyasa agent bağlantısı aktif olduğunda burada özetlenecek.</p>}
           </div>
         </section>
       </div>

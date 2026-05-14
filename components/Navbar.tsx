@@ -16,9 +16,18 @@ const defaultLinks = [
   { label: "Kayıt", href: "#alpha" },
 ];
 
+const signedInLinks = [
+  { label: "Agentlar", href: "/#agents" },
+  { label: "Piyasa", href: "/#market" },
+  { label: "Haberler", href: "/#news" },
+  { label: "Bütçe", href: "/#spending" },
+  { label: "Asistan", href: "/#assistant" },
+];
+
 export function Navbar({ links = defaultLinks, userName }: NavbarProps) {
   const [isOpen, setIsOpen] = useState(false);
   const isSignedIn = Boolean(userName);
+  const navLinks = isSignedIn ? signedInLinks : links;
 
   return (
     <header className="sticky top-0 z-50 border-b border-white/10 bg-[#050505]/70 backdrop-blur-md">
@@ -31,7 +40,7 @@ export function Navbar({ links = defaultLinks, userName }: NavbarProps) {
         </a>
 
         <div className="hidden items-center gap-8 md:flex">
-          {links.map((link) => (
+          {navLinks.map((link) => (
             <a key={link.href} href={link.href} className="text-sm text-slate-300 transition hover:text-white">
               {link.label}
             </a>
@@ -74,7 +83,7 @@ export function Navbar({ links = defaultLinks, userName }: NavbarProps) {
       <div className={cn("grid transition-all duration-300 md:hidden", isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}>
         <div className="overflow-hidden">
           <div className="mx-5 mb-5 rounded-3xl border border-white/10 bg-white/[0.04] p-4 backdrop-blur-xl">
-            {links.map((link) => (
+            {navLinks.map((link) => (
               <a key={link.href} href={link.href} className="block rounded-2xl px-4 py-3 text-sm text-slate-200 hover:bg-white/10" onClick={() => setIsOpen(false)}>
                 {link.label}
               </a>

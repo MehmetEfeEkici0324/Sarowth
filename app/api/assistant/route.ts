@@ -55,7 +55,7 @@ export async function POST(request: Request) {
     });
   }
 
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -95,7 +95,14 @@ Kullanıcının sorusu: ${message}`,
   });
 
   if (!response.ok) {
-    return NextResponse.json({ reply: "Gemini yanıtı alınamadı. Biraz sonra tekrar deneyebilirsin." }, { status: 502 });
+    const errorText = await response.text();
+    const reply = `Gemini şu anda yanıt vermedi. API anahtarını ve Vercel env tanımını kontrol et. Teknik hata: ${response.status} ${errorText.slice(0, 240)}`;
+    await supabase.from("assistant_messages").insert({
+      user_id: userData.user.id,
+      role: "assistant",
+      content: reply,
+    });
+    return NextResponse.json({ reply }, { status: 200 });
   }
 
   const data = await response.json();

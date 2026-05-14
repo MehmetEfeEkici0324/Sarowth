@@ -160,7 +160,7 @@ function AuthenticatedHome({ userName, profile, budgetEntries, ideas }: Authenti
             <AgentNewsSection />
           </div>
 
-          <section className="mt-6 rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl sm:p-8">
+          <section id="spending" className="mt-6 rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl sm:p-8">
             <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
               <div>
                 <div className="flex items-center gap-3">
@@ -203,7 +203,7 @@ function AuthenticatedHome({ userName, profile, budgetEntries, ideas }: Authenti
 
 function AgentMarketSection() {
   return (
-    <section className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl sm:p-8">
+    <section id="market" className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl sm:p-8">
       <div className="flex items-center gap-3">
         <Radar className="text-emerald-300" size={22} />
         <h2 className="text-2xl font-semibold tracking-[-0.03em]">Piyasada yükselen ürünler</h2>
@@ -228,7 +228,7 @@ function AgentMarketSection() {
 
 function AgentNewsSection() {
   return (
-    <section className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl sm:p-8">
+    <section id="news" className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl sm:p-8">
       <div className="flex items-center gap-3">
         <Newspaper className="text-blue-300" size={22} />
         <h2 className="text-2xl font-semibold tracking-[-0.03em]">Finans ve e-ticaret haberleri</h2>
