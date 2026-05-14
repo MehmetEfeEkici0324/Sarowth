@@ -19,10 +19,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ reply: "Bu asistanı kullanmak için önce giriş yapmalısın." }, { status: 401 });
   }
 
-  const [{ data: profile }, { data: budgetEntries }, { data: ideas }] = await Promise.all([
+  const [{ data: profile }, { data: budgetEntries }, { data: ideas }, { data: previousMessages }] = await Promise.all([
     supabase.from("profiles").select("full_name, monthly_income, savings_goal, risk_preference").eq("id", userData.user.id).single(),
     supabase.from("budget_entries").select("label, category, amount, entry_type").eq("user_id", userData.user.id).limit(30),
     supabase.from("ecommerce_ideas").select("product_name, audience, demand_score, estimated_margin, status, notes").eq("user_id", userData.user.id).limit(20),
+    supabase.from("assistant_messages").select("role, content").eq("user_id", userData.user.id).order("created_at", { ascending: false }).limit(8),
   ]);
 
   const apiKey = process.env.GEMINI_API_KEY;
@@ -30,11 +31,25 @@ export async function POST(request: Request) {
     profile,
     budgetEntries: budgetEntries ?? [],
     ecommerceIdeas: ideas ?? [],
+    previousMessages: (previousMessages ?? []).reverse(),
   };
 
+  await supabase.from("assistant_messages").insert({
+    user_id: userData.user.id,
+    role: "user",
+    content: message.trim(),
+  });
+
   if (!apiKey) {
+    const fallbackReply = "Gemini API anahtarı henüz tanımlı değil. Yine de temel öneri: önce Bütçem sayfasında gelir ve giderlerini tamamla, sonra E-Ticaret sayfasında en yüksek talep ve marj skoruna sahip tek ürünü küçük bütçeyle test et.";
+    await supabase.from("assistant_messages").insert({
+      user_id: userData.user.id,
+      role: "assistant",
+      content: fallbackReply,
+    });
+
     return NextResponse.json({
-      reply: "Gemini API anahtarı henüz tanımlı değil. Yine de temel öneri: önce Bütçem sayfasında gelir ve giderlerini tamamla, sonra E-Ticaret sayfasında en yüksek talep ve marj skoruna sahip tek ürünü küçük bütçeyle test et.",
+      reply: fallbackReply,
     });
   }
 
@@ -47,7 +62,7 @@ export async function POST(request: Request) {
           role: "user",
           parts: [
             {
-              text: `Sen Sarowth içinde çalışan Türkçe kişisel finans ve e-ticaret asistanısın. Kullanıcıya kısa, uygulanabilir ve riskleri belirten öneriler ver. Kullanıcının bağlamı: ${JSON.stringify(context)}. Kullanıcının sorusu: ${message}`,
+              text: `Sen Sarowth içinde çalışan Türkçe kişisel finans, bütçe ve e-ticaret asistanısın. Kullanıcıya kısa, uygulanabilir, riskleri belirten ve kişisel verilerine dayanan öneriler ver. Yatırım tavsiyesi verirken kesin getiri vaadi verme, risk uyarısı ekle. Kullanıcının bağlamı: ${JSON.stringify(context)}. Kullanıcının sorusu: ${message}`,
             },
           ],
         },
@@ -65,6 +80,12 @@ export async function POST(request: Request) {
 
   const data = await response.json();
   const reply = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "Şu anda net bir öneri üretemedim. Sorunu biraz daha detaylandırır mısın?";
+
+  await supabase.from("assistant_messages").insert({
+    user_id: userData.user.id,
+    role: "assistant",
+    content: reply,
+  });
 
   return NextResponse.json({ reply });
 }

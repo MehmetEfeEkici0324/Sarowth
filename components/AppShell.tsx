@@ -20,7 +20,7 @@ export function AppShell({ title, subtitle, children }: AppShellProps) {
       <div className="absolute inset-x-0 top-0 h-96 bg-[radial-gradient(circle_at_20%_15%,rgba(16,185,129,0.14),transparent_28%),radial-gradient(circle_at_80%_0%,rgba(59,130,246,0.14),transparent_30%)]" />
       <div className="relative mx-auto grid max-w-7xl gap-6 px-5 py-6 sm:px-8 lg:grid-cols-[17rem_1fr]">
         <aside className="rounded-[2rem] border border-white/10 bg-white/[0.05] p-4 backdrop-blur-xl lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)]">
-          <a href="/dashboard" className="flex items-center gap-3 rounded-2xl px-3 py-3">
+          <a href="/" className="flex items-center gap-3 rounded-2xl px-3 py-3">
             <span className="grid h-10 w-10 place-items-center rounded-2xl border border-emerald-400/30 bg-emerald-400/10">
               <BarChart3 className="text-emerald-200" size={19} />
             </span>
