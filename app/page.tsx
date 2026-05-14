@@ -4,6 +4,7 @@ import { AgentCards } from "@/components/AgentCards";
 import { Footer } from "@/components/Footer";
 import { Hero } from "@/components/Hero";
 import { Navbar } from "@/components/Navbar";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 interface HomePageProps {}
 
@@ -15,10 +16,24 @@ export const metadata: Metadata = {
   },
 };
 
-export default function HomePage({}: HomePageProps) {
+export default async function HomePage({}: HomePageProps) {
+  let userName: string | null = null;
+
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { data } = await supabase.auth.getUser();
+
+    if (data.user) {
+      const { data: profile } = await supabase.from("profiles").select("full_name, email").eq("id", data.user.id).single();
+      userName = profile?.full_name?.split(" ")[0] ?? profile?.email ?? data.user.email ?? "Profil";
+    }
+  } catch {
+    userName = null;
+  }
+
   return (
     <main className="min-h-screen overflow-hidden bg-[#050505] text-white">
-      <Navbar />
+      <Navbar userName={userName} />
       <Hero />
       <AgentCards />
       <CycleSection />

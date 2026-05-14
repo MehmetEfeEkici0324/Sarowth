@@ -55,11 +55,65 @@ create table if not exists public.email_verification_codes (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.bank_connections (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  provider text not null,
+  account_name text not null,
+  status text not null default 'pending' check (status in ('pending', 'connected', 'error', 'disabled')),
+  last_synced_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.bank_transactions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  connection_id uuid references public.bank_connections(id) on delete set null,
+  description text not null,
+  category text not null,
+  amount numeric(12, 2) not null,
+  transaction_type text not null check (transaction_type in ('income', 'expense')),
+  occurred_on date not null,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.market_product_signals (
+  id uuid primary key default gen_random_uuid(),
+  product_name text not null,
+  signal text not null,
+  score integer not null default 50 check (score between 0 and 100),
+  source_url text,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.finance_news_items (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  source text not null,
+  url text not null,
+  summary text,
+  published_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.assistant_messages (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  role text not null check (role in ('user', 'assistant')),
+  content text not null,
+  created_at timestamptz not null default now()
+);
+
 alter table public.profiles enable row level security;
 alter table public.budget_entries enable row level security;
 alter table public.ecommerce_ideas enable row level security;
 alter table public.agent_cycle_events enable row level security;
 alter table public.email_verification_codes enable row level security;
+alter table public.bank_connections enable row level security;
+alter table public.bank_transactions enable row level security;
+alter table public.market_product_signals enable row level security;
+alter table public.finance_news_items enable row level security;
+alter table public.assistant_messages enable row level security;
 
 drop policy if exists "Users can read own profile" on public.profiles;
 drop policy if exists "Users can update own profile" on public.profiles;
@@ -73,6 +127,12 @@ drop policy if exists "Users can update own ecommerce ideas" on public.ecommerce
 drop policy if exists "Users can delete own ecommerce ideas" on public.ecommerce_ideas;
 drop policy if exists "Users can read own cycle events" on public.agent_cycle_events;
 drop policy if exists "Users can insert own cycle events" on public.agent_cycle_events;
+drop policy if exists "Users can read own bank connections" on public.bank_connections;
+drop policy if exists "Users can read own bank transactions" on public.bank_transactions;
+drop policy if exists "Users can read own assistant messages" on public.assistant_messages;
+drop policy if exists "Users can insert own assistant messages" on public.assistant_messages;
+drop policy if exists "Anyone can read market signals" on public.market_product_signals;
+drop policy if exists "Anyone can read finance news" on public.finance_news_items;
 
 create policy "Users can read own profile"
 on public.profiles for select
@@ -124,6 +184,30 @@ using (auth.uid() = user_id);
 create policy "Users can insert own cycle events"
 on public.agent_cycle_events for insert
 with check (auth.uid() = user_id);
+
+create policy "Users can read own bank connections"
+on public.bank_connections for select
+using (auth.uid() = user_id);
+
+create policy "Users can read own bank transactions"
+on public.bank_transactions for select
+using (auth.uid() = user_id);
+
+create policy "Users can read own assistant messages"
+on public.assistant_messages for select
+using (auth.uid() = user_id);
+
+create policy "Users can insert own assistant messages"
+on public.assistant_messages for insert
+with check (auth.uid() = user_id);
+
+create policy "Anyone can read market signals"
+on public.market_product_signals for select
+using (true);
+
+create policy "Anyone can read finance news"
+on public.finance_news_items for select
+using (true);
 
 create or replace function public.set_updated_at()
 returns trigger
@@ -179,3 +263,8 @@ create index if not exists ecommerce_ideas_user_status_idx on public.ecommerce_i
 create index if not exists agent_cycle_events_user_created_idx on public.agent_cycle_events(user_id, created_at desc);
 create index if not exists email_verification_codes_email_idx on public.email_verification_codes(email, created_at desc);
 create index if not exists email_verification_codes_user_idx on public.email_verification_codes(user_id, created_at desc);
+create index if not exists bank_connections_user_idx on public.bank_connections(user_id, status);
+create index if not exists bank_transactions_user_date_idx on public.bank_transactions(user_id, occurred_on desc);
+create index if not exists market_product_signals_score_idx on public.market_product_signals(score desc, created_at desc);
+create index if not exists finance_news_items_published_idx on public.finance_news_items(published_at desc nulls last, created_at desc);
+create index if not exists assistant_messages_user_created_idx on public.assistant_messages(user_id, created_at desc);

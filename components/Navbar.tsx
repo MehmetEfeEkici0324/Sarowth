@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 
 interface NavbarProps {
   links?: Array<{ label: string; href: string }>;
+  userName?: string | null;
 }
 
 const defaultLinks = [
@@ -15,8 +16,9 @@ const defaultLinks = [
   { label: "Kayıt", href: "#alpha" },
 ];
 
-export function Navbar({ links = defaultLinks }: NavbarProps) {
+export function Navbar({ links = defaultLinks, userName }: NavbarProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const isSignedIn = Boolean(userName);
 
   return (
     <header className="sticky top-0 z-50 border-b border-white/10 bg-[#050505]/70 backdrop-blur-md">
@@ -37,12 +39,25 @@ export function Navbar({ links = defaultLinks }: NavbarProps) {
         </div>
 
         <div className="hidden items-center gap-3 md:flex">
-          <a href="/login" className="rounded-full px-5 py-2 text-sm text-slate-200 transition hover:bg-white/10">
-            Giriş Yap
-          </a>
-          <a href="/signup" className="rounded-full bg-gradient-to-r from-emerald-400 to-blue-500 px-5 py-2 text-sm font-semibold text-[#03110c] shadow-[0_0_28px_rgba(59,130,246,0.24)] transition hover:scale-[1.02]">
-            Kayıt Ol
-          </a>
+          {isSignedIn ? (
+            <>
+              <a href="/dashboard" className="rounded-full px-5 py-2 text-sm text-slate-200 transition hover:bg-white/10">
+                Panel
+              </a>
+              <a href="/profile" className="rounded-full bg-gradient-to-r from-emerald-400 to-blue-500 px-5 py-2 text-sm font-semibold text-[#03110c] shadow-[0_0_28px_rgba(59,130,246,0.24)] transition hover:scale-[1.02]">
+                {userName}
+              </a>
+            </>
+          ) : (
+            <>
+              <a href="/login" className="rounded-full px-5 py-2 text-sm text-slate-200 transition hover:bg-white/10">
+                Giriş Yap
+              </a>
+              <a href="/signup" className="rounded-full bg-gradient-to-r from-emerald-400 to-blue-500 px-5 py-2 text-sm font-semibold text-[#03110c] shadow-[0_0_28px_rgba(59,130,246,0.24)] transition hover:scale-[1.02]">
+                Kayıt Ol
+              </a>
+            </>
+          )}
         </div>
 
         <button
@@ -65,12 +80,25 @@ export function Navbar({ links = defaultLinks }: NavbarProps) {
               </a>
             ))}
             <div className="mt-3 grid gap-3">
-              <a href="/login" className="rounded-full border border-white/10 px-5 py-3 text-center text-sm text-white">
-                Giriş Yap
-              </a>
-              <a href="/signup" className="rounded-full bg-gradient-to-r from-emerald-400 to-blue-500 px-5 py-3 text-center text-sm font-semibold text-[#03110c]">
-                Kayıt Ol
-              </a>
+              {isSignedIn ? (
+                <>
+                  <a href="/dashboard" className="rounded-full border border-white/10 px-5 py-3 text-center text-sm text-white">
+                    Panel
+                  </a>
+                  <a href="/profile" className="rounded-full bg-gradient-to-r from-emerald-400 to-blue-500 px-5 py-3 text-center text-sm font-semibold text-[#03110c]">
+                    {userName}
+                  </a>
+                </>
+              ) : (
+                <>
+                  <a href="/login" className="rounded-full border border-white/10 px-5 py-3 text-center text-sm text-white">
+                    Giriş Yap
+                  </a>
+                  <a href="/signup" className="rounded-full bg-gradient-to-r from-emerald-400 to-blue-500 px-5 py-3 text-center text-sm font-semibold text-[#03110c]">
+                    Kayıt Ol
+                  </a>
+                </>
+              )}
             </div>
           </div>
         </div>
