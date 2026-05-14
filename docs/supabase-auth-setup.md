@@ -20,11 +20,30 @@ For Gmail, you usually need an app password, not the normal mailbox password.
 
 ## Email OTP Template
 
-In Authentication > Emails, make sure the OTP template includes the token:
+In Authentication > Emails, make sure the confirmation template includes the token. The code UI expects a 6-digit token:
 
 ```txt
 Your Sarowth verification code is {{ .Token }}
 ```
+
+If Supabase is still sending a clickable link instead of a token, update the "Confirm signup" template and include `{{ .Token }}` visibly in the email body.
+
+## Required Email Settings
+
+In Authentication > Providers > Email:
+
+- Enable Email provider.
+- Enable Confirm email.
+- Keep Secure email change enabled.
+- For this app flow, users register with email + password, verify the email code, then log in with email + password.
+
+If emails do not arrive:
+
+- Check Supabase Authentication > Logs.
+- Check Gmail SMTP app password, not the normal Gmail password.
+- Check Gmail account security alerts.
+- Check spam/promotions folder.
+- Wait one minute before requesting another code because Supabase applies rate limits.
 
 ## URL Configuration
 

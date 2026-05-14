@@ -112,6 +112,34 @@ export async function verifyEmailCode(_prevState: AuthResult, formData: FormData
   redirect("/dashboard");
 }
 
+export async function resendVerificationCode(_prevState: AuthResult, formData: FormData): Promise<AuthResult> {
+  const email = String(formData.get("email") ?? "").trim();
+
+  if (!email) {
+    return { error: "Email address is missing." };
+  }
+
+  const configError = getSupabaseConfigError();
+  if (configError) {
+    return { error: configError };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.auth.resend({
+    type: "signup",
+    email,
+    options: {
+      emailRedirectTo: `${getSiteUrl()}/auth/callback`,
+    },
+  });
+
+  if (error) {
+    return { error: "We could not resend the code. Wait a minute, then try again." };
+  }
+
+  return {};
+}
+
 export async function signOut() {
   const configError = getSupabaseConfigError();
   if (configError) {

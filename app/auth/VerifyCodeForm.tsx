@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import { ShieldCheck } from "lucide-react";
-import { verifyEmailCode } from "@/app/auth/actions";
+import { resendVerificationCode, verifyEmailCode } from "@/app/auth/actions";
 
 interface VerifyCodeFormProps {
   email: string;
@@ -11,6 +11,7 @@ interface VerifyCodeFormProps {
 
 export function VerifyCodeForm({ email, flow }: VerifyCodeFormProps) {
   const [state, formAction, isPending] = useActionState(verifyEmailCode, { error: undefined });
+  const [resendState, resendAction, isResending] = useActionState(resendVerificationCode, { error: undefined });
 
   return (
     <div className="w-full max-w-md rounded-[2rem] border border-white/10 bg-white/[0.05] p-6 shadow-[0_0_60px_rgba(16,185,129,0.08)] backdrop-blur-xl">
@@ -30,6 +31,13 @@ export function VerifyCodeForm({ email, flow }: VerifyCodeFormProps) {
       <p className="mt-6 text-center text-sm text-slate-400">
         Wrong email? <a href={flow === "signup" ? "/signup" : "/login"} className="font-semibold text-emerald-300 hover:text-emerald-200">Start again</a>
       </p>
+      <form action={resendAction} className="mt-4 text-center">
+        <input type="hidden" name="email" value={email} />
+        <button disabled={isResending} type="submit" className="text-sm font-semibold text-emerald-300 transition hover:text-emerald-200 disabled:cursor-not-allowed disabled:opacity-60">
+          {isResending ? "Sending again..." : "Send a new code"}
+        </button>
+        {resendState.error ? <p className="mt-3 rounded-2xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-sm text-red-200">{resendState.error}</p> : null}
+      </form>
     </div>
   );
 }
