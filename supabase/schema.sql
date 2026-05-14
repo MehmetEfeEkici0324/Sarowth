@@ -45,10 +45,21 @@ create table if not exists public.agent_cycle_events (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.email_verification_codes (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  email text not null,
+  code_hash text not null,
+  expires_at timestamptz not null,
+  consumed_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
 alter table public.profiles enable row level security;
 alter table public.budget_entries enable row level security;
 alter table public.ecommerce_ideas enable row level security;
 alter table public.agent_cycle_events enable row level security;
+alter table public.email_verification_codes enable row level security;
 
 drop policy if exists "Users can read own profile" on public.profiles;
 drop policy if exists "Users can update own profile" on public.profiles;
@@ -166,3 +177,5 @@ for each row execute function public.set_updated_at();
 create index if not exists budget_entries_user_date_idx on public.budget_entries(user_id, occurred_on desc);
 create index if not exists ecommerce_ideas_user_status_idx on public.ecommerce_ideas(user_id, status);
 create index if not exists agent_cycle_events_user_created_idx on public.agent_cycle_events(user_id, created_at desc);
+create index if not exists email_verification_codes_email_idx on public.email_verification_codes(email, created_at desc);
+create index if not exists email_verification_codes_user_idx on public.email_verification_codes(user_id, created_at desc);

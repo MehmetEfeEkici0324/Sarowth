@@ -1,14 +1,36 @@
 # Supabase Auth Setup
 
-Sarowth uses one sign-in method:
+Sarowth uses one sign-in method and its own mail sender agent:
 
 - Email + password for login.
-- Email verification code during registration.
+- Custom email verification code during registration.
 - Google and GitHub OAuth are intentionally removed from the UI.
 
-## Email Sender
+## Mail Sender Agent
 
-To send codes from `sarowth@gmail.com`, configure Supabase SMTP:
+The app now sends verification codes through `lib/mail/agent.ts` using the Resend API. This avoids relying on Supabase's built-in email templates.
+
+Required Vercel environment variables:
+
+```txt
+RESEND_API_KEY=your-resend-api-key
+MAIL_FROM=Sarowth <verify@sarowth.com>
+EMAIL_CODE_SECRET=long-random-secret
+SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
+```
+
+Recommended sender setup:
+
+1. Create a Resend account.
+2. Add and verify your sending domain, ideally `sarowth.com`.
+3. Add the DNS records Resend gives you.
+4. Use `MAIL_FROM=Sarowth <verify@sarowth.com>` after the domain is verified.
+
+If you insist on sending directly from `sarowth@gmail.com`, configure Gmail SMTP in a transactional email provider that supports it. Direct Gmail SMTP is fragile on serverless platforms and can fail due to Google security checks.
+
+## Old Supabase SMTP Option
+
+Supabase SMTP is no longer required for the custom code flow. If you still want Supabase emails for other flows, configure it here:
 
 1. Open Supabase Dashboard.
 2. Go to Authentication > Emails > SMTP Settings.
@@ -18,9 +40,9 @@ To send codes from `sarowth@gmail.com`, configure Supabase SMTP:
 
 For Gmail, you usually need an app password, not the normal mailbox password.
 
-## Email OTP Template
+## Supabase Built-in Email Template
 
-In Authentication > Emails, make sure the confirmation template includes the token. The code UI expects a 6-digit token:
+This is not used by the custom mail sender agent, but if you re-enable Supabase's built-in email confirmation, make sure the confirmation template includes the token:
 
 ```txt
 Your Sarowth verification code is {{ .Token }}
@@ -28,22 +50,23 @@ Your Sarowth verification code is {{ .Token }}
 
 If Supabase is still sending a clickable link instead of a token, update the "Confirm signup" template and include `{{ .Token }}` visibly in the email body.
 
-## Required Email Settings
+## Required Supabase Auth Settings
 
 In Authentication > Providers > Email:
 
 - Enable Email provider.
-- Enable Confirm email.
+- Confirm email can stay enabled, but the app confirms users via the service-role admin API after custom code verification.
 - Keep Secure email change enabled.
 - For this app flow, users register with email + password, verify the email code, then log in with email + password.
 
-If emails do not arrive:
+If emails do not arrive with the custom mail sender:
 
-- Check Supabase Authentication > Logs.
-- Check Gmail SMTP app password, not the normal Gmail password.
-- Check Gmail account security alerts.
+- Check Vercel Function logs for the exact Resend error.
+- Check Resend Logs.
+- Make sure `RESEND_API_KEY` is set in Vercel production.
+- Make sure `MAIL_FROM` uses a verified Resend domain.
 - Check spam/promotions folder.
-- Wait one minute before requesting another code because Supabase applies rate limits.
+- Wait one minute before requesting another code if the provider rate limits you.
 
 ## URL Configuration
 
