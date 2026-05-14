@@ -5,6 +5,8 @@ interface AssistantRequest {
   message?: string;
 }
 
+const fallbackModels = ["gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-2.0-flash-lite", "gemini-2.0-flash"];
+
 export async function POST(request: Request) {
   const { message }: AssistantRequest = await request.json();
 
@@ -55,16 +57,13 @@ export async function POST(request: Request) {
     });
   }
 
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-8b:generateContent?key=${apiKey}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [
-        {
-          role: "user",
-          parts: [
-            {
-              text: `Sen Sarowth içinde çalışan Türkçe kişisel finans, bütçe ve e-ticaret asistanısın.
+  const requestBody = {
+    contents: [
+      {
+        role: "user",
+        parts: [
+          {
+            text: `Sen Sarowth içinde çalışan Türkçe kişisel finans, bütçe ve e-ticaret asistanısın.
 
 Ürün vizyonu:
 - Kullanıcı bütçe verisini manuel girmez; banka agent'ı gelir, gider, geçmiş ay harcamaları ve kategori dağılımını getirir.
@@ -83,20 +82,39 @@ Davranış kuralları:
 
 Kullanıcının bağlamı: ${JSON.stringify(context)}
 Kullanıcının sorusu: ${message}`,
-            },
-          ],
-        },
-      ],
-      generationConfig: {
-        temperature: 0.45,
-        maxOutputTokens: 700,
+          },
+        ],
       },
-    }),
-  });
+    ],
+    generationConfig: {
+      temperature: 0.45,
+      maxOutputTokens: 700,
+    },
+  };
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    const reply = `Gemini şu anda yanıt vermedi. API anahtarını ve Vercel env tanımını kontrol et. Teknik hata: ${response.status} ${errorText.slice(0, 240)}`;
+  const modelsToTry = [process.env.GEMINI_MODEL, ...fallbackModels].filter(Boolean) as string[];
+  let response: Response | null = null;
+  let lastErrorText = "";
+  let usedModel = "";
+
+  for (const model of [...new Set(modelsToTry)]) {
+    usedModel = model;
+    response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (response.ok) break;
+
+    lastErrorText = await response.text();
+
+    if (response.status !== 404) break;
+  }
+
+  if (!response?.ok) {
+    const status = response?.status ?? "bilinmiyor";
+    const reply = `Gemini şu anda yanıt vermedi. API anahtarını, kota durumunu ve model erişimini kontrol et. Denenen son model: ${usedModel}. Teknik hata: ${status} ${lastErrorText.slice(0, 240)}`;
     await supabase.from("assistant_messages").insert({
       user_id: userData.user.id,
       role: "assistant",
