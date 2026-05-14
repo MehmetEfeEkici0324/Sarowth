@@ -15,7 +15,7 @@ const entryTypeLabels: Record<string, string> = {
 
 export const metadata: Metadata = {
   title: "Bütçem",
-  description: "Gelir, gider ve birikimlerini özel Sarowth bütçe alanında takip et.",
+  description: "Banka agent ile çekilecek gelir, gider ve harcama kategorilerini Sarowth içinde takip et.",
   robots: { index: false, follow: false },
 };
 
@@ -27,15 +27,15 @@ export default async function BudgetPage({}: BudgetPageProps) {
   const savings = entries?.filter((entry) => entry.entry_type === "saving").reduce((sum, entry) => sum + Number(entry.amount), 0) ?? 0;
 
   return (
-    <AppShell title="Bütçem" subtitle="Koruyabileceğin, yeniden yönlendirebileceğin ve düşük riskli e-ticaret testlerinde kullanabileceğin parayı sade şekilde takip et.">
+    <AppShell title="Bütçem" subtitle="Bu alan banka agent için hazırlanmış bütçe görünümüdür. Agent bağlandığında gelir, gider, yemek, ulaşım, fatura, borç ve ihtiyaç harcamaların otomatik dolacak.">
       <div className="grid gap-4 md:grid-cols-3">
-        <StatCard label="Kaydedilen gelir" value={`$${income.toLocaleString()}`} detail="Bu döngüye eklenen nakit." />
-        <StatCard label="Kaydedilen gider" value={`$${expenses.toLocaleString()}`} detail="Kullanılabilir sermayeyi azaltan harcamalar." />
-        <StatCard label="Kaydedilen birikim" value={`$${savings.toLocaleString()}`} detail="Ayrılmaya hazır korunan para." />
+        <StatCard label="Agent gelir toplamı" value={`₺${income.toLocaleString()}`} detail="Banka bağlantısı aktif olduğunda otomatik güncellenecek." />
+        <StatCard label="Agent gider toplamı" value={`₺${expenses.toLocaleString()}`} detail="Kart ve hesap hareketlerinden okunacak." />
+        <StatCard label="Tespit edilen tasarruf" value={`₺${savings.toLocaleString()}`} detail="Önceki aya göre ayrılabilen tutar." />
       </div>
       <div className="mt-6 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
         <form action={addBudgetEntry} className="grid gap-4 rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl">
-          <h2 className="text-2xl font-semibold">Kayıt ekle</h2>
+          <h2 className="text-2xl font-semibold">Agent bağlantısı gelene kadar test kaydı</h2>
           <input name="label" placeholder="Başlık" className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-400/10" />
           <input name="category" placeholder="Kategori" className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-400/10" />
           <input name="amount" type="number" min="0" step="0.01" placeholder="Tutar" className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none focus:border-blue-400/60 focus:ring-4 focus:ring-blue-400/10" />
@@ -44,10 +44,10 @@ export default async function BudgetPage({}: BudgetPageProps) {
             <option value="income">Gelir</option>
             <option value="saving">Birikim</option>
           </select>
-          <FormSubmit idleLabel="Bütçeye ekle" />
+          <FormSubmit idleLabel="Test kaydı ekle" />
         </form>
         <section className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl">
-          <h2 className="text-2xl font-semibold">Son kayıtlar</h2>
+          <h2 className="text-2xl font-semibold">Agent verisi / test kayıtları</h2>
           <div className="mt-5 grid gap-3">
             {entries && entries.length > 0 ? entries.map((entry) => (
               <div key={entry.id} className="flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-black/25 p-4">
@@ -57,7 +57,7 @@ export default async function BudgetPage({}: BudgetPageProps) {
                 </div>
                 <p className="font-mono text-lg font-semibold">${Number(entry.amount).toLocaleString()}</p>
               </div>
-            )) : <p className="rounded-2xl border border-white/10 bg-black/25 p-4 leading-7 text-slate-400">Bir gelir ve tekrar eden bir giderle başla. Sayfa hemen anlamlı hale gelir.</p>}
+            )) : <p className="rounded-2xl border border-white/10 bg-black/25 p-4 leading-7 text-slate-400">Banka agent bağlandığında bu liste otomatik dolacak. Şimdilik istersen test verisi ekleyebilirsin.</p>}
           </div>
         </section>
       </div>

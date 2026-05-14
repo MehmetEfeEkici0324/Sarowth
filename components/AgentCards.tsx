@@ -16,27 +16,27 @@ interface AgentCardData {
 
 const agents: AgentCardData[] = [
   {
-    title: "Koruyucu",
-    subtitle: "Harcama netliği",
-    description: "Bütçendeki sessiz kaçakları bulur ve hangi kesintilerin gerçekten işe yarar test sermayesi oluşturduğunu gösterir.",
+    title: "Banka Ajanı",
+    subtitle: "Anlık harcama analizi",
+    description: "Gelir, gider, kart hareketleri ve geçmiş ay alışkanlıklarını okuyarak hangi kategoride fazla harcadığını anlar.",
     icon: <ShieldCheck size={28} />,
     tone: "emerald",
     signals: [
-      { label: "İsraf azaldı", value: "-22%", icon: <Utensils size={16} /> },
-      { label: "Ayrılan sermaye", value: "$184", icon: <WalletCards size={16} /> },
-      { label: "Takip maddesi", value: "3", icon: <Zap size={16} /> },
+      { label: "Yemek artışı", value: "+24%", icon: <Utensils size={16} /> },
+      { label: "Net tasarruf", value: "₺1.000", icon: <WalletCards size={16} /> },
+      { label: "Risk uyarısı", value: "3", icon: <Zap size={16} /> },
     ],
   },
   {
-    title: "Avcı",
-    subtitle: "Ürün doğrulama",
-    description: "Ürün fikirlerini talep, marj, hedef kitle uyumu ve lansman riskiyle karşılaştırarak net bir kısa listeye dönüştürür.",
+    title: "Piyasa Ajanı",
+    subtitle: "Trend ve kazanç sinyalleri",
+    description: "Haberleri, pazar yeri sinyallerini, popülerleşen ürünleri ve yatırım alanlarını tarayıp sadece bakılabilecek alanları gösterir.",
     icon: <Target size={28} />,
     tone: "blue",
     signals: [
-      { label: "Takip edilen ürün", value: "14", icon: <Bot size={16} /> },
-      { label: "En iyi marj", value: "41%", icon: <WalletCards size={16} /> },
-      { label: "Lansman skoru", value: "92", icon: <Zap size={16} /> },
+      { label: "Yükselen ürün", value: "14", icon: <Bot size={16} /> },
+      { label: "Olası marj", value: "41%", icon: <WalletCards size={16} /> },
+      { label: "Trend skoru", value: "92", icon: <Zap size={16} /> },
     ],
   },
 ];
@@ -46,8 +46,8 @@ export function AgentCards({ className }: AgentCardsProps) {
     <section id="agents" className={cn("mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:py-28", className)}>
       <div className="mx-auto max-w-3xl text-center">
         <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-300">Nasıl çalışır</p>
-        <h2 className="mt-4 text-4xl font-semibold tracking-[-0.04em] text-white sm:text-6xl">Önce paranı koru. Sonra ürünü test et.</h2>
-        <p className="mt-5 text-lg leading-8 text-slate-300">Sarowth tek bir pratik döngü üzerine kurulu: bütçeni anla, küçük bir tutar ayır, ürün fikrini test et ve sonucu değerlendir.</p>
+        <h2 className="mt-4 text-4xl font-semibold tracking-[-0.04em] text-white sm:text-6xl">Veriyi sen girmezsin. Ajanlar getirir.</h2>
+        <p className="mt-5 text-lg leading-8 text-slate-300">Sarowth'un amacı banka verilerini, piyasa haberlerini ve ticari hesaplarını okuyup Gemini ile sana kişisel ve temkinli karar desteği sunmaktır.</p>
       </div>
 
       <div className="mt-12 grid gap-6 lg:grid-cols-2">

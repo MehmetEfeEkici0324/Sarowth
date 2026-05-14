@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { ArrowUpRight, BadgeDollarSign, Landmark, Mail, Newspaper, Radar, ShoppingBag, TrendingUp } from "lucide-react";
+import { ArrowUpRight, BadgeDollarSign, Landmark, Mail, Newspaper, PlugZap, Radar, ShoppingBag, TrendingUp } from "lucide-react";
 import { AgentCards } from "@/components/AgentCards";
 import { AssistantChat } from "@/components/AssistantChat";
 import { Footer } from "@/components/Footer";
@@ -30,9 +30,16 @@ const financeNews = [
 ];
 
 const investmentIdeas = [
-  "Acil durum payını ayır, kalan küçük tutarı ürün testi bütçesine dönüştür.",
-  "Stok almadan önce tek ürün için reklam kreatifi ve talep testi yap.",
-  "Kazancın tamamını büyütmeye değil, bir kısmını güvenli bütçeye geri aktar.",
+  "Geçen ay oluşan tasarrufun bir kısmı ürün testi bütçesi olarak ayrılabilir.",
+  "Popülerleşen ürünlerde stok almadan önce reklam ve talep testi yapılmalı.",
+  "Hisse, coin veya fon tarafında gösterilen alanlar yatırım tavsiyesi değildir; sadece bakılabilecek sinyallerdir.",
+];
+
+const agentConnections = [
+  { name: "Banka Agent", status: "Hazır", detail: "Gelir, gider, kart hareketleri ve kategori dağılımını çeker." },
+  { name: "Haber Agent", status: "Hazır", detail: "Finans ve e-ticaret haberlerinden fırsat sinyali çıkarır." },
+  { name: "Piyasa Agent", status: "Hazır", detail: "Popülerleşen ürünleri ve talep artışlarını izler." },
+  { name: "Ticari Hesap Agent", status: "Planlandı", detail: "Shopier, Shopify ve Midas gibi hesaplardan kar/zarar okur." },
 ];
 
 const statusLabels: Record<string, string> = {
@@ -116,18 +123,37 @@ function AuthenticatedHome({ userName, profile, budgetEntries, ideas }: Authenti
             <div className="rounded-[2rem] border border-white/10 bg-white/[0.05] p-6 backdrop-blur-xl sm:p-8">
               <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-300">Kişisel Ana Sayfa</p>
               <h1 className="mt-4 max-w-3xl text-4xl font-semibold tracking-[-0.05em] sm:text-6xl">Hoş geldin, {profile?.full_name?.split(" ")[0] ?? userName}.</h1>
-              <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-300">Agent altyapısı burada çalışır: piyasa sinyalleri, finans haberleri, banka/bütçe analizi, ürün kazancı ve Gemini asistan tek ekranda birleşir.</p>
+              <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-300">Banka, haber, piyasa ve ticari hesap agent'ları veriyi getirir. Gemini asistan bu verilerle alışveriş, tasarruf ve kar geliştirme kararlarında sana kişisel destek verir.</p>
               <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-                <a href="/budget" className="rounded-full bg-gradient-to-r from-emerald-400 to-blue-500 px-6 py-3 text-center font-semibold text-[#03110c]">Bütçemi Güncelle</a>
-                <a href="/ecommerce" className="rounded-full border border-white/10 bg-white/[0.04] px-6 py-3 text-center font-semibold text-white transition hover:bg-white/10">Ürün Fikri Ekle</a>
+                <a href="#assistant" className="rounded-full bg-gradient-to-r from-emerald-400 to-blue-500 px-6 py-3 text-center font-semibold text-[#03110c]">Asistana Sor</a>
+                <a href="#agents" className="rounded-full border border-white/10 bg-white/[0.04] px-6 py-3 text-center font-semibold text-white transition hover:bg-white/10">Agent Durumlarını Gör</a>
               </div>
             </div>
             <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-1">
-              <StatCard label="Döngü sermayesi" value={`$${cycleCapital.toLocaleString()}`} detail="Bütçe kayıtlarına göre kullanılabilir tutar." />
+              <StatCard label="Bu ayki net alan" value={`₺${cycleCapital.toLocaleString()}`} detail="Banka agent verisiyle otomatik hesaplanacak tutar." />
               <StatCard label="Aylık hedef" value={`$${Number(profile?.savings_goal ?? 500).toLocaleString()}`} detail="Profilindeki güncel birikim hedefi." />
               <StatCard label="En yüksek harcama" value={topExpense ? topExpense[0] : "Yok"} detail={topExpense ? `$${topExpense[1].toLocaleString()} harcama görünüyor.` : "Bütçe verisi bekleniyor."} />
             </div>
           </div>
+
+          <section id="agents" className="mt-6 rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl sm:p-8">
+            <div className="flex items-center gap-3">
+              <PlugZap className="text-emerald-300" size={22} />
+              <h2 className="text-3xl font-semibold tracking-[-0.04em]">Agent bağlantı katmanı</h2>
+            </div>
+            <p className="mt-3 max-w-3xl leading-7 text-slate-400">Kullanıcı veri girmek zorunda kalmaz. Bu bağlantılar aktif olduğunda banka, haber, piyasa ve ticari hesap verileri anlık olarak çekilip Gemini asistanına bağlam olur.</p>
+            <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              {agentConnections.map((agent) => (
+                <div key={agent.name} className="rounded-3xl border border-white/10 bg-black/25 p-5">
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="font-semibold text-white">{agent.name}</h3>
+                    <span className="rounded-full bg-emerald-400/10 px-3 py-1 text-xs text-emerald-200">{agent.status}</span>
+                  </div>
+                  <p className="mt-3 text-sm leading-6 text-slate-400">{agent.detail}</p>
+                </div>
+              ))}
+            </div>
+          </section>
 
           <div className="mt-6 grid gap-6 lg:grid-cols-2">
             <AgentMarketSection />
@@ -141,20 +167,23 @@ function AuthenticatedHome({ userName, profile, budgetEntries, ideas }: Authenti
                   <Landmark className="text-emerald-300" size={22} />
                   <h2 className="text-3xl font-semibold tracking-[-0.04em]">Banka ve harcama görünümü</h2>
                 </div>
-                <p className="mt-3 max-w-3xl leading-7 text-slate-400">Banka agent bağlandığında gelir, gider ve kategori dağılımı otomatik güncellenecek. Şimdilik Bütçem sayfasındaki kayıtlarınla görselleştiriliyor.</p>
+                <p className="mt-3 max-w-3xl leading-7 text-slate-400">Banka agent gelirini, giderini, önceki ay harcamalarını ve bu ayki kategori dağılımını anlık çeker. Gemini asistan satın alma kararlarını bu tabloya göre yorumlar.</p>
               </div>
-              <a href="/budget" className="rounded-full border border-white/10 px-5 py-3 text-center text-sm font-semibold text-white transition hover:bg-white/10">Bütçeye Git</a>
+              <a href="#assistant" className="rounded-full border border-white/10 px-5 py-3 text-center text-sm font-semibold text-white transition hover:bg-white/10">Satın Alma Sor</a>
             </div>
-            <div className="mt-6 grid gap-4 md:grid-cols-3">
-              <StatCard label="Toplam gelir" value={`$${income.toLocaleString()}`} detail="Kaydedilen gelir toplamı." />
-              <StatCard label="Toplam gider" value={`$${expenses.toLocaleString()}`} detail="Kaydedilen gider toplamı." />
-              <StatCard label="Toplam birikim" value={`$${savings.toLocaleString()}`} detail="Ayrılmış birikim toplamı." />
+            <div className="mt-6 grid gap-6 lg:grid-cols-[0.75fr_1.25fr] lg:items-center">
+              <SpendingDonut categories={expenseByCategory} total={expenses} />
+              <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-1">
+                <StatCard label="Toplam gelir" value={`₺${income.toLocaleString()}`} detail="Banka agent ile otomatik gelir toplamı." />
+                <StatCard label="Toplam gider" value={`₺${expenses.toLocaleString()}`} detail="Bu ayki harcama toplamı." />
+                <StatCard label="Toplam tasarruf" value={`₺${savings.toLocaleString()}`} detail="Geçen aydan veya bu aydan ayrılan tutar." />
+              </div>
             </div>
             <div className="mt-6 grid gap-3">
               {expenseByCategory.length > 0 ? expenseByCategory.slice(0, 5).map(([category, amount]) => {
                 const percent = expenses > 0 ? Math.round((amount / expenses) * 100) : 0;
                 return <CategoryBar key={category} category={category} amount={amount} percent={percent} />;
-              }) : <p className="rounded-2xl border border-white/10 bg-black/25 p-4 text-slate-400">Kategori grafiği için Bütçem sayfasından birkaç gider ekle.</p>}
+              }) : <p className="rounded-2xl border border-white/10 bg-black/25 p-4 text-slate-400">Banka agent bağlantısı aktif olduğunda kategori grafiği gerçek harcamalarınla dolacak. Şimdilik örnek dağılım gösteriliyor.</p>}
             </div>
           </section>
 
@@ -163,7 +192,7 @@ function AuthenticatedHome({ userName, profile, budgetEntries, ideas }: Authenti
             <CommerceReturnsSection ideas={ideas} />
           </div>
 
-          <div className="mt-6">
+          <div id="assistant" className="mt-6">
             <AssistantChat />
           </div>
         </div>
@@ -235,6 +264,48 @@ function CategoryBar({ category, amount, percent }: { category: string; amount: 
   );
 }
 
+function SpendingDonut({ categories, total }: { categories: Array<[string, number]>; total: number }) {
+  const fallback = [
+    ["Yemek", 38],
+    ["Ulaşım", 18],
+    ["Fatura", 22],
+    ["İhtiyaç", 14],
+    ["Diğer", 8],
+  ] as Array<[string, number]>;
+  const source = categories.length > 0 && total > 0 ? categories.map(([category, amount]) => [category, Math.round((amount / total) * 100)] as [string, number]) : fallback;
+  const colors = ["#10b981", "#3b82f6", "#a855f7", "#f59e0b", "#64748b"];
+  let cursor = 0;
+  const gradient = source.map(([, percent], index) => {
+    const start = cursor;
+    cursor += percent;
+    return `${colors[index % colors.length]} ${start}% ${cursor}%`;
+  }).join(", ");
+
+  return (
+    <div className="rounded-[2rem] border border-white/10 bg-black/25 p-5">
+      <div className="mx-auto grid h-56 w-56 place-items-center rounded-full" style={{ background: `conic-gradient(${gradient})` }}>
+        <div className="grid h-32 w-32 place-items-center rounded-full bg-[#050505] text-center">
+          <div>
+            <p className="text-3xl font-semibold text-white">%100</p>
+            <p className="text-xs text-slate-500">harcama dağılımı</p>
+          </div>
+        </div>
+      </div>
+      <div className="mt-5 grid gap-2">
+        {source.map(([category, percent], index) => (
+          <div key={category} className="flex items-center justify-between gap-3 text-sm">
+            <div className="flex items-center gap-2 text-slate-300">
+              <span className="h-3 w-3 rounded-full" style={{ backgroundColor: colors[index % colors.length] }} />
+              {category}
+            </div>
+            <span className="font-mono text-white">%{percent}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function InvestmentSection() {
   return (
     <section className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl sm:p-8">
@@ -247,6 +318,7 @@ function InvestmentSection() {
           <div key={idea} className="rounded-2xl border border-white/10 bg-black/25 p-4 leading-7 text-slate-300">{idea}</div>
         ))}
       </div>
+      <p className="mt-5 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4 text-sm leading-6 text-amber-100">Buradaki hisse, coin, fon veya ürün alanları yatırım tavsiyesi değildir. Sadece agent'ların taradığı verilerden oluşan bakılabilecek alanlardır.</p>
     </section>
   );
 }

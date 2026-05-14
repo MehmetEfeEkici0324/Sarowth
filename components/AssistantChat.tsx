@@ -12,7 +12,7 @@ export function AssistantChat() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      content: "Merhaba, ben Sarowth asistanın. Bütçen, ürün fikirlerin ve tasarruf hedeflerine göre öneri sunabilirim.",
+      content: "Merhaba, ben Sarowth asistanın. Banka hareketlerin, harcama kategorilerin, tasarruf hedefin ve ürün fikirlerin üzerinden kişisel karar desteği sunarım. Bir şey almak istiyorsan bana sorabilirsin.",
     },
   ]);
   const [input, setInput] = useState("");
@@ -45,9 +45,9 @@ export function AssistantChat() {
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-300">Kişisel Asistan</p>
-          <h2 className="mt-2 text-3xl font-semibold tracking-[-0.04em]">Gemini destekli bütçe sohbeti</h2>
+          <h2 className="mt-2 text-3xl font-semibold tracking-[-0.04em]">Gemini destekli kişisel karar asistanı</h2>
         </div>
-        <p className="max-w-md text-sm leading-6 text-slate-400">Asistan; profilini, bütçe kayıtlarını, ürün fikirlerini ve tasarruf hedeflerini bağlam olarak kullanır.</p>
+        <p className="max-w-md text-sm leading-6 text-slate-400">Asistan; banka agent'ı, piyasa agent'ı, ticari hesap agent'ı ve konuşma geçmişini bağlam olarak kullanacak şekilde tasarlandı.</p>
       </div>
 
       <div className="mt-6 grid max-h-[26rem] gap-3 overflow-y-auto rounded-3xl border border-white/10 bg-black/25 p-4">
@@ -65,7 +65,7 @@ export function AssistantChat() {
           onKeyDown={(event) => {
             if (event.key === "Enter") sendMessage();
           }}
-          placeholder="Örn: Bu ay 500 TL tasarruf edersem ne yapmalıyım?"
+          placeholder="Örn: Bu ay ayakkabı almalı mıyım, yoksa beklemeli miyim?"
           className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none placeholder:text-slate-500 focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-400/10"
         />
         <button onClick={sendMessage} disabled={isPending} className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-400 to-blue-500 px-5 py-3 font-semibold text-[#03110c] disabled:opacity-60">

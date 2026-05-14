@@ -19,10 +19,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ reply: "Bu asistanı kullanmak için önce giriş yapmalısın." }, { status: 401 });
   }
 
-  const [{ data: profile }, { data: budgetEntries }, { data: ideas }, { data: previousMessages }] = await Promise.all([
+  const [{ data: profile }, { data: budgetEntries }, { data: ideas }, { data: bankTransactions }, { data: previousMessages }] = await Promise.all([
     supabase.from("profiles").select("full_name, monthly_income, savings_goal, risk_preference").eq("id", userData.user.id).single(),
     supabase.from("budget_entries").select("label, category, amount, entry_type").eq("user_id", userData.user.id).limit(30),
     supabase.from("ecommerce_ideas").select("product_name, audience, demand_score, estimated_margin, status, notes").eq("user_id", userData.user.id).limit(20),
+    supabase.from("bank_transactions").select("description, category, amount, transaction_type, occurred_on").eq("user_id", userData.user.id).order("occurred_on", { ascending: false }).limit(80),
     supabase.from("assistant_messages").select("role, content").eq("user_id", userData.user.id).order("created_at", { ascending: false }).limit(8),
   ]);
 
@@ -30,6 +31,7 @@ export async function POST(request: Request) {
   const context = {
     profile,
     budgetEntries: budgetEntries ?? [],
+    bankTransactions: bankTransactions ?? [],
     ecommerceIdeas: ideas ?? [],
     previousMessages: (previousMessages ?? []).reverse(),
   };
@@ -41,7 +43,7 @@ export async function POST(request: Request) {
   });
 
   if (!apiKey) {
-    const fallbackReply = "Gemini API anahtarı henüz tanımlı değil. Yine de temel öneri: önce Bütçem sayfasında gelir ve giderlerini tamamla, sonra E-Ticaret sayfasında en yüksek talep ve marj skoruna sahip tek ürünü küçük bütçeyle test et.";
+    const fallbackReply = "Gemini API anahtarı henüz tanımlı değil. Temel yaklaşım: önce bu ayki gelir-gider dengesine bak, yüksek harcama kategorilerini azalt, oluşan tasarrufu düşük riskli test bütçesine ayır. Yatırım ve ürün fikirleri yatırım tavsiyesi değildir; sadece bakılabilecek alanlardır.";
     await supabase.from("assistant_messages").insert({
       user_id: userData.user.id,
       role: "assistant",
@@ -62,7 +64,25 @@ export async function POST(request: Request) {
           role: "user",
           parts: [
             {
-              text: `Sen Sarowth içinde çalışan Türkçe kişisel finans, bütçe ve e-ticaret asistanısın. Kullanıcıya kısa, uygulanabilir, riskleri belirten ve kişisel verilerine dayanan öneriler ver. Yatırım tavsiyesi verirken kesin getiri vaadi verme, risk uyarısı ekle. Kullanıcının bağlamı: ${JSON.stringify(context)}. Kullanıcının sorusu: ${message}`,
+              text: `Sen Sarowth içinde çalışan Türkçe kişisel finans, bütçe ve e-ticaret asistanısın.
+
+Ürün vizyonu:
+- Kullanıcı bütçe verisini manuel girmez; banka agent'ı gelir, gider, geçmiş ay harcamaları ve kategori dağılımını getirir.
+- Piyasa/haber agent'ı popülerleşen ürünleri, finans haberlerini ve bakılabilecek alanları getirir.
+- Ticaret/yatırım agent'ı Shopier, Shopify, Midas vb. hesaplardan kar, zarar, talep gören ürünler ve artan/azalan varlıkları gösterir.
+- Gemini asistan bu bağlamla satın alma, bekleme, tasarruf ve kar geliştirme önerisi verir.
+
+Davranış kuralları:
+- Kullanıcı bir ürün almak istediğinde bu ayki harcama kategorilerine, önceki konuşmalara, gelir-gider dengesine ve tasarruf hedeflerine bak.
+- Bütçe zorlanıyorsa net şekilde "şimdi alma" veya "bekle" de.
+- Eğer belirli kategori bu ay yüksekse, örneğin yemek harcaması artmışsa bunu gerekçe göster.
+- Tasarruf oluşmuşsa ürün testi, ticari ürün tedariki veya finansal olarak bakılabilecek alanları listele.
+- Hisse, coin, fon gibi alanlarda kesinlikle "yatırım tavsiyesi değildir" ifadesini kullan. Bunları sadece "bakılabilecek alan" olarak anlat.
+- Getiri garantisi verme, kişiyi yönlendiren kesin emirler verme, riskleri açıkça belirt.
+- Cevaplar kısa, net, kişisel ve uygulanabilir olsun.
+
+Kullanıcının bağlamı: ${JSON.stringify(context)}
+Kullanıcının sorusu: ${message}`,
             },
           ],
         },

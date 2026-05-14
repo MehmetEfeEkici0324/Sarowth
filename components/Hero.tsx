@@ -18,8 +18,8 @@ const trends = [
 ];
 
 export function Hero({
-  headline = "Elindeki parayla daha akıllı bir iş kur.",
-  subtext = "Sarowth, gereksiz harcamaları görmeni, küçük birikimleri korumanı ve bu bütçeyi kontrollü e-ticaret denemelerine dönüştürmeni sağlar.",
+  headline = "Bütçeni ajanlar izlesin, kararlarını sen ver.",
+  subtext = "Sarowth; banka hareketlerini, harcama alışkanlıklarını, piyasa sinyallerini ve ticari hesaplarını agent'larla okuyup Gemini destekli kişisel asistanına dönüştürür.",
 }: HeroProps) {
   return (
     <section id="top" className="relative overflow-hidden px-5 pb-20 pt-16 sm:px-8 lg:pb-28 lg:pt-24">
@@ -31,7 +31,7 @@ export function Hero({
         <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }}>
           <div className="mb-6 flex flex-wrap items-center gap-3">
             <div className="inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-4 py-2 text-sm text-emerald-200 shadow-[0_0_30px_rgba(16,185,129,0.12)]">
-              <Sparkles size={16} /> Kişisel bütçeden ürün testine
+              <Sparkles size={16} /> Banka, piyasa ve Gemini agent'ları tek yerde
             </div>
             <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-sm text-slate-300 backdrop-blur-xl">
               Erken erişim
@@ -44,11 +44,11 @@ export function Hero({
 
           <div className="mt-9 flex flex-col gap-4 sm:flex-row">
             <a href="/signup" className="group inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-emerald-400 to-blue-500 px-7 py-4 font-semibold text-[#03110c] shadow-[0_0_36px_rgba(16,185,129,0.24)] transition hover:scale-[1.02]">
-              Kodla Kayıt Ol
+              Kişisel Asistanını Başlat
               <ArrowRight className="transition group-hover:translate-x-1" size={18} />
             </a>
             <a href="#tracker" className="inline-flex items-center justify-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-7 py-4 font-semibold text-white backdrop-blur-xl transition hover:bg-white/10">
-              Trendleri İncele
+              Agent Akışını İncele
             </a>
           </div>
         </motion.div>
@@ -58,14 +58,14 @@ export function Hero({
           <div className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.05] p-5 shadow-2xl backdrop-blur-xl">
             <div className="flex items-center justify-between border-b border-white/10 pb-4">
               <div>
-                <p className="text-sm text-slate-400">Kullanılabilir döngü sermayesi</p>
+                <p className="text-sm text-slate-400">Agent'ın ayırdığı tasarruf</p>
                 <p className="text-3xl font-semibold text-white">$4,280</p>
               </div>
               <div className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-sm text-emerald-200">Canlı</div>
             </div>
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
-              <MetricCard icon={<Activity size={18} />} label="Aylık kaçak harcama" value="-18%" tone="emerald" />
-              <MetricCard icon={<TrendingUp size={18} />} label="Test bütçesi" value="$742" tone="blue" />
+              <MetricCard icon={<Activity size={18} />} label="Yemek harcaması" value="+24%" tone="emerald" />
+              <MetricCard icon={<TrendingUp size={18} />} label="Ürün fırsatı" value="87/100" tone="blue" />
             </div>
             <div className="mt-5 rounded-3xl border border-white/10 bg-black/30 p-4">
               <div className="mb-4 flex items-center gap-3">
@@ -73,9 +73,9 @@ export function Hero({
                 <p className="font-medium text-white">Bu haftanın döngüsü</p>
               </div>
               {[
-                ["Kullanılmayan abonelikler durduruldu", "$42"],
-                ["Doğrulanacak ürün marjı", "31%"],
-                ["Küçük test bütçesi ayrıldı", "$120"],
+                ["Yemek harcaması bütçeyi aştı", "%24"],
+                ["Geçen ay tasarruf edildi", "₺1.000"],
+                ["Bakılabilecek ürün sinyali", "3"],
               ].map(([label, value]) => (
                 <div key={label} className="flex items-center justify-between border-t border-white/10 py-3 text-sm">
                   <span className="text-slate-300">{label}</span>
