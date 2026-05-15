@@ -32,7 +32,7 @@ export function Navbar({ links = defaultLinks, userName }: NavbarProps) {
   return (
     <header className="sticky top-0 z-50 border-b border-white/10 bg-[#050505]/70 backdrop-blur-md">
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-8">
-        <a href="#top" className="group flex items-center gap-3" aria-label="Sarowth ana sayfa">
+        <a href="/" className="group flex items-center gap-3" aria-label="Sarowth ana sayfa">
           <span className="grid h-9 w-9 place-items-center rounded-2xl border border-emerald-400/40 bg-emerald-400/10 shadow-[0_0_35px_rgba(16,185,129,0.2)]">
             <span className="h-3 w-3 rounded-full bg-emerald-400 shadow-[0_0_18px_rgba(16,185,129,0.9)]" />
           </span>
