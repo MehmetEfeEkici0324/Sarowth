@@ -96,30 +96,48 @@ Kullanıcının sorusu: ${message}`,
   let response: Response | null = null;
   let lastErrorText = "";
   let usedModel = "";
+  let lastStatus = 200;
 
-  for (const model of [...new Set(modelsToTry)]) {
+  const uniqueModels = [...new Set(modelsToTry)];
+
+  for (const model of uniqueModels) {
     usedModel = model;
-    response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(requestBody),
-    });
+    
+    try {
+      response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestBody),
+      });
 
-    if (response.ok) break;
+      lastStatus = response.status;
 
-    lastErrorText = await response.text();
+      if (response.ok) break;
 
-    if (response.status !== 404) break;
+      lastErrorText = await response.text();
+
+      // Eğer 429 kota hatası veya 404 model bulunamadı hatası alırsan durma, sonraki modeli dene
+      if (response.status === 429 || response.status === 404) {
+        continue; 
+      }
+
+      break;
+
+    } catch (err) {
+      lastErrorText = "Fetch hatası oluştu.";
+      continue;
+    }
   }
 
   if (!response?.ok) {
-    const status = response?.status ?? "bilinmiyor";
-    const reply = `Gemini şu anda yanıt vermedi. API anahtarını, kota durumunu ve model erişimini kontrol et. Denenen son model: ${usedModel}. Teknik hata: ${status} ${lastErrorText.slice(0, 240)}`;
+    const reply = `Gemini şu anda yanıt vermedi. Kota sınırına takılmış veya yoğunluk olabilir. Denenen son model: ${usedModel}. Teknik hata: ${lastStatus} ${lastErrorText.slice(0, 200)}`;
+    
     await supabase.from("assistant_messages").insert({
       user_id: userData.user.id,
       role: "assistant",
       content: reply,
     });
+    
     return NextResponse.json({ reply }, { status: 200 });
   }
 
