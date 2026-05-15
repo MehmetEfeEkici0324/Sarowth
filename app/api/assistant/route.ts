@@ -90,7 +90,7 @@ Kullanıcının sorusu: ${message}`,
     },
   };
 
-  const model = "gemini-1.5-flash";
+  const model = "gemini-2.0-flash";
 
   let response: Response;
 
