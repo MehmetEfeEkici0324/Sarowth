@@ -5,6 +5,31 @@ interface AssistantRequest {
   message?: string;
 }
 
+function readGeminiModel() {
+  return process.env.GEMINI_MODEL?.trim() || "gemini-2.0-flash";
+}
+
+function getGeminiErrorReply(status: number, errorText: string) {
+  if (status === 429) {
+    return "Gemini kotası dolmuş veya billing limiti aşılmış görünüyor. Google AI Studio/Gemini API kota ve faturalandırma ayarlarını kontrol edip tekrar dene.";
+  }
+
+  if (status === 400) {
+    return "Gemini isteği geçersiz döndü. Model adı, istek içeriği veya API anahtarı ayarlarını kontrol et.";
+  }
+
+  if (status === 401 || status === 403) {
+    return "Gemini API anahtarı yetkisiz görünüyor. GEMINI_API_KEY değerini ve anahtar izinlerini kontrol et.";
+  }
+
+  if (status === 404) {
+    return "Gemini modeli bulunamadı veya generateContent için desteklenmiyor. GEMINI_MODEL değerini kontrol et.";
+  }
+
+  const compactError = errorText.replace(/\s+/g, " ").slice(0, 200);
+  return `Gemini şu anda yanıt vermedi. Durum: ${status}${compactError ? ` - ${compactError}` : ""}`;
+}
+
 export async function POST(request: Request) {
   const { message }: AssistantRequest = await request.json();
 
@@ -90,14 +115,17 @@ Kullanıcının sorusu: ${message}`,
     },
   };
 
-  const model = "gemini-2.0-flash";
+  const model = readGeminiModel();
 
   let response: Response;
 
   try {
-    response = await fetch(`https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${apiKey}`, {
+    response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey,
+      },
       body: JSON.stringify(requestBody),
     });
   } catch {
@@ -112,7 +140,7 @@ Kullanıcının sorusu: ${message}`,
 
   if (!response.ok) {
     const errorText = await response.text();
-    const reply = `Gemini şu anda yanıt vermedi. API anahtarını ve kota durumunu kontrol et. Hata: ${response.status} ${errorText.slice(0, 200)}`;
+    const reply = getGeminiErrorReply(response.status, errorText);
     await supabase.from("assistant_messages").insert({
       user_id: userData.user.id,
       role: "assistant",
