@@ -5,8 +5,6 @@ interface AssistantRequest {
   message?: string;
 }
 
-const fallbackModels = ["gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-2.0-flash-lite", "gemini-2.0-flash"];
-
 export async function POST(request: Request) {
   const { message }: AssistantRequest = await request.json();
 
@@ -92,52 +90,34 @@ Kullanıcının sorusu: ${message}`,
     },
   };
 
-  const modelsToTry = [process.env.GEMINI_MODEL, ...fallbackModels].filter(Boolean) as string[];
-  let response: Response | null = null;
-  let lastErrorText = "";
-  let usedModel = "";
-  let lastStatus = 200;
+  const model = "gemini-1.5-flash";
 
-  const uniqueModels = [...new Set(modelsToTry)];
+  let response: Response;
 
-  for (const model of uniqueModels) {
-    usedModel = model;
-    
-    try {
-      response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(requestBody),
-      });
-
-      lastStatus = response.status;
-
-      if (response.ok) break;
-
-      lastErrorText = await response.text();
-
-      // Eğer 429 kota hatası veya 404 model bulunamadı hatası alırsan durma, sonraki modeli dene
-      if (response.status === 429 || response.status === 404) {
-        continue; 
-      }
-
-      break;
-
-    } catch (err) {
-      lastErrorText = "Fetch hatası oluştu.";
-      continue;
-    }
-  }
-
-  if (!response?.ok) {
-    const reply = `Gemini şu anda yanıt vermedi. Kota sınırına takılmış veya yoğunluk olabilir. Denenen son model: ${usedModel}. Teknik hata: ${lastStatus} ${lastErrorText.slice(0, 200)}`;
-    
+  try {
+    response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(requestBody),
+    });
+  } catch {
+    const reply = "Gemini'ye bağlanırken bir hata oluştu. İnternet bağlantını kontrol et ve tekrar dene.";
     await supabase.from("assistant_messages").insert({
       user_id: userData.user.id,
       role: "assistant",
       content: reply,
     });
-    
+    return NextResponse.json({ reply }, { status: 200 });
+  }
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    const reply = `Gemini şu anda yanıt vermedi. API anahtarını ve kota durumunu kontrol et. Hata: ${response.status} ${errorText.slice(0, 200)}`;
+    await supabase.from("assistant_messages").insert({
+      user_id: userData.user.id,
+      role: "assistant",
+      content: reply,
+    });
     return NextResponse.json({ reply }, { status: 200 });
   }
 
