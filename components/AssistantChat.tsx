@@ -62,13 +62,10 @@ export function AssistantChat() {
         <input
           value={input}
           onChange={(event) => setInput(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") sendMessage();
-          }}
           placeholder="Örn: Bu ay ayakkabı almalı mıyım, yoksa beklemeli miyim?"
           className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none placeholder:text-slate-500 focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-400/10"
         />
-        <button onClick={sendMessage} disabled={isPending} className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-400 to-blue-500 px-5 py-3 font-semibold text-[#03110c] disabled:opacity-60">
+        <button type="button" onClick={sendMessage} disabled={isPending} className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-400 to-blue-500 px-5 py-3 font-semibold text-[#03110c] disabled:opacity-60">
           <Send size={17} /> {isPending ? "Düşünüyor" : "Gönder"}
         </button>
       </div>

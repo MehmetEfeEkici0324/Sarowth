@@ -5,7 +5,30 @@ interface AssistantRequest {
   message?: string;
 }
 
-const fallbackModels = ["gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-2.0-flash-lite", "gemini-2.0-flash"];
+function readGeminiModel() {
+  return process.env.GEMINI_MODEL?.trim() || "gemini-2.0-flash";
+}
+
+function getGeminiErrorReply(status: number, errorText: string) {
+  if (status === 429) {
+    return "Gemini kotası dolmuş veya billing limiti aşılmış görünüyor. Google AI Studio/Gemini API kota ve faturalandırma ayarlarını kontrol edip tekrar dene.";
+  }
+
+  if (status === 400) {
+    return "Gemini isteği geçersiz döndü. Model adı, istek içeriği veya API anahtarı ayarlarını kontrol et.";
+  }
+
+  if (status === 401 || status === 403) {
+    return "Gemini API anahtarı yetkisiz görünüyor. GEMINI_API_KEY değerini ve anahtar izinlerini kontrol et.";
+  }
+
+  if (status === 404) {
+    return "Gemini modeli bulunamadı veya generateContent için desteklenmiyor. GEMINI_MODEL değerini kontrol et.";
+  }
+
+  const compactError = errorText.replace(/\s+/g, " ").slice(0, 200);
+  return `Gemini şu anda yanıt vermedi. Durum: ${status}${compactError ? ` - ${compactError}` : ""}`;
+}
 
 export async function POST(request: Request) {
   const { message }: AssistantRequest = await request.json();
@@ -101,29 +124,32 @@ Kullanıcının sorusu: ${message}`,
     },
   };
 
-  const modelsToTry = [process.env.GEMINI_MODEL, ...fallbackModels].filter(Boolean) as string[];
-  let response: Response | null = null;
-  let lastErrorText = "";
-  let usedModel = "";
+  const model = readGeminiModel();
 
-  for (const model of [...new Set(modelsToTry)]) {
-    usedModel = model;
-    response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+  let response: Response;
+
+  try {
+    response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey,
+      },
       body: JSON.stringify(requestBody),
     });
-
-    if (response.ok) break;
-
-    lastErrorText = await response.text();
-
-    if (response.status !== 404) break;
+  } catch {
+    const reply = "Gemini'ye bağlanırken bir hata oluştu. İnternet bağlantını kontrol et ve tekrar dene.";
+    await supabase.from("assistant_messages").insert({
+      user_id: userData.user.id,
+      role: "assistant",
+      content: reply,
+    });
+    return NextResponse.json({ reply }, { status: 200 });
   }
 
-  if (!response?.ok) {
-    const status = response?.status ?? "bilinmiyor";
-    const reply = `Gemini şu anda yanıt vermedi. API anahtarını, kota durumunu ve model erişimini kontrol et. Denenen son model: ${usedModel}. Teknik hata: ${status} ${lastErrorText.slice(0, 240)}`;
+  if (!response.ok) {
+    const errorText = await response.text();
+    const reply = getGeminiErrorReply(response.status, errorText);
     await supabase.from("assistant_messages").insert({
       user_id: userData.user.id,
       role: "assistant",
