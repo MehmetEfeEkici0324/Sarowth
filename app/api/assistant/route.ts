@@ -21,13 +21,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ reply: "Bu asistanı kullanmak için önce giriş yapmalısın." }, { status: 401 });
   }
 
-  const [{ data: profile }, { data: budgetEntries }, { data: ideas }, { data: bankTransactions }, { data: previousMessages }] = await Promise.all([
-    supabase.from("profiles").select("full_name, monthly_income, savings_goal, risk_preference").eq("id", userData.user.id).single(),
-    supabase.from("budget_entries").select("label, category, amount, entry_type").eq("user_id", userData.user.id).limit(30),
-    supabase.from("ecommerce_ideas").select("product_name, audience, demand_score, estimated_margin, status, notes").eq("user_id", userData.user.id).limit(20),
-    supabase.from("bank_transactions").select("description, category, amount, transaction_type, occurred_on").eq("user_id", userData.user.id).order("occurred_on", { ascending: false }).limit(80),
-    supabase.from("assistant_messages").select("role, content").eq("user_id", userData.user.id).order("created_at", { ascending: false }).limit(8),
-  ]);
+  // Gemini yalnızca bu chat isteği geldiğinde çağrılır; site içi diğer aksiyonlar modele gönderilmez.
+  const { data: profile } = await supabase.from("profiles").select("full_name, monthly_income, savings_goal, risk_preference").eq("id", userData.user.id).single();
+  const { data: budgetEntries } = await supabase.from("budget_entries").select("label, category, amount, entry_type").eq("user_id", userData.user.id).limit(30);
+  const { data: bankTransactions } = await supabase.from("bank_transactions").select("description, category, amount, transaction_type, occurred_on").eq("user_id", userData.user.id).order("occurred_on", { ascending: false }).limit(60);
+  const { data: ideas } = await supabase.from("ecommerce_ideas").select("product_name, audience, demand_score, estimated_margin, status, notes").eq("user_id", userData.user.id).order("created_at", { ascending: false }).limit(12);
+  const { data: commerceMetrics } = await supabase.from("commerce_metrics_daily").select("provider, revenue, cost, ad_spend, net_profit, metric_day").eq("user_id", userData.user.id).order("metric_day", { ascending: false }).limit(14);
+  const { data: commerceProducts } = await supabase.from("commerce_products").select("product_name, units_sold, revenue, estimated_margin, trend").eq("user_id", userData.user.id).order("updated_at", { ascending: false }).limit(10);
+  const { data: marketSignals } = await supabase.from("market_product_signals").select("product_name, signal, score").order("score", { ascending: false }).limit(5);
+  const { data: financeNews } = await supabase.from("finance_news_items").select("title, source, summary").order("published_at", { ascending: false }).order("created_at", { ascending: false }).limit(5);
+  const { data: previousMessages } = await supabase.from("assistant_messages").select("role, content").eq("user_id", userData.user.id).order("created_at", { ascending: false }).limit(6);
 
   const apiKey = process.env.GEMINI_API_KEY;
   const context = {
@@ -35,6 +38,10 @@ export async function POST(request: Request) {
     budgetEntries: budgetEntries ?? [],
     bankTransactions: bankTransactions ?? [],
     ecommerceIdeas: ideas ?? [],
+    commerceMetrics: commerceMetrics ?? [],
+    commerceProducts: commerceProducts ?? [],
+    marketSignals: marketSignals ?? [],
+    financeNews: financeNews ?? [],
     previousMessages: (previousMessages ?? []).reverse(),
   };
 
@@ -63,7 +70,7 @@ export async function POST(request: Request) {
         role: "user",
         parts: [
           {
-            text: `Sen Sarowth içinde çalışan Türkçe kişisel finans, bütçe ve e-ticaret asistanısın.
+            text: `Sen Sarowth içinde çalışan Türkçe kişisel finans, bütçe, alışveriş kararı ve e-ticaret asistanısın.
 
 Ürün vizyonu:
 - Kullanıcı bütçe verisini manuel girmez; banka agent'ı gelir, gider, geçmiş ay harcamaları ve kategori dağılımını getirir.
@@ -72,6 +79,8 @@ export async function POST(request: Request) {
 - Gemini asistan bu bağlamla satın alma, bekleme, tasarruf ve kar geliştirme önerisi verir.
 
 Davranış kuralları:
+- Bu modele sadece kullanıcının chat kutusuna yazdığı mesajlar gelir. Site içinde yapılan her değişikliği olay gibi yorumlama.
+- Kullanıcı sormadığı sürece gereksiz veri dökümü yapma; sadece soruyu yanıtlamak için gereken bağlamı kullan.
 - Kullanıcı bir ürün almak istediğinde bu ayki harcama kategorilerine, önceki konuşmalara, gelir-gider dengesine ve tasarruf hedeflerine bak.
 - Bütçe zorlanıyorsa net şekilde "şimdi alma" veya "bekle" de.
 - Eğer belirli kategori bu ay yüksekse, örneğin yemek harcaması artmışsa bunu gerekçe göster.

@@ -69,6 +69,7 @@ create table if not exists public.bank_transactions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   connection_id uuid references public.bank_connections(id) on delete set null,
+  provider_transaction_id text,
   description text not null,
   category text not null,
   amount numeric(12, 2) not null,
@@ -76,6 +77,9 @@ create table if not exists public.bank_transactions (
   occurred_on date not null,
   created_at timestamptz not null default now()
 );
+
+alter table public.bank_transactions
+add column if not exists provider_transaction_id text;
 
 create table if not exists public.market_product_signals (
   id uuid primary key default gen_random_uuid(),
@@ -104,6 +108,54 @@ create table if not exists public.assistant_messages (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.agent_runs (
+  id uuid primary key default gen_random_uuid(),
+  agent_name text not null,
+  status text not null default 'running' check (status in ('running', 'success', 'error')),
+  input_summary text,
+  output_summary text,
+  error_message text,
+  started_at timestamptz not null default now(),
+  finished_at timestamptz
+);
+
+create table if not exists public.commerce_accounts (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  provider text not null,
+  account_name text not null,
+  status text not null default 'pending' check (status in ('pending', 'connected', 'error', 'disabled')),
+  last_synced_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.commerce_products (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  account_id uuid references public.commerce_accounts(id) on delete set null,
+  provider_product_id text,
+  product_name text not null,
+  units_sold integer not null default 0 check (units_sold >= 0),
+  revenue numeric(12, 2) not null default 0,
+  estimated_margin numeric(5, 2) not null default 0 check (estimated_margin >= 0),
+  trend text not null default 'stable' check (trend in ('rising', 'stable', 'falling')),
+  updated_at timestamptz not null default now(),
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.commerce_metrics_daily (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  account_id uuid references public.commerce_accounts(id) on delete set null,
+  provider text not null,
+  revenue numeric(12, 2) not null default 0,
+  cost numeric(12, 2) not null default 0,
+  ad_spend numeric(12, 2) not null default 0,
+  net_profit numeric(12, 2) not null default 0,
+  metric_day date not null default current_date,
+  created_at timestamptz not null default now()
+);
+
 alter table public.profiles enable row level security;
 alter table public.budget_entries enable row level security;
 alter table public.ecommerce_ideas enable row level security;
@@ -114,6 +166,10 @@ alter table public.bank_transactions enable row level security;
 alter table public.market_product_signals enable row level security;
 alter table public.finance_news_items enable row level security;
 alter table public.assistant_messages enable row level security;
+alter table public.agent_runs enable row level security;
+alter table public.commerce_accounts enable row level security;
+alter table public.commerce_products enable row level security;
+alter table public.commerce_metrics_daily enable row level security;
 
 drop policy if exists "Users can read own profile" on public.profiles;
 drop policy if exists "Users can update own profile" on public.profiles;
@@ -133,6 +189,9 @@ drop policy if exists "Users can read own assistant messages" on public.assistan
 drop policy if exists "Users can insert own assistant messages" on public.assistant_messages;
 drop policy if exists "Anyone can read market signals" on public.market_product_signals;
 drop policy if exists "Anyone can read finance news" on public.finance_news_items;
+drop policy if exists "Users can read own commerce accounts" on public.commerce_accounts;
+drop policy if exists "Users can read own commerce products" on public.commerce_products;
+drop policy if exists "Users can read own commerce metrics" on public.commerce_metrics_daily;
 
 create policy "Users can read own profile"
 on public.profiles for select
@@ -209,6 +268,18 @@ create policy "Anyone can read finance news"
 on public.finance_news_items for select
 using (true);
 
+create policy "Users can read own commerce accounts"
+on public.commerce_accounts for select
+using (auth.uid() = user_id);
+
+create policy "Users can read own commerce products"
+on public.commerce_products for select
+using (auth.uid() = user_id);
+
+create policy "Users can read own commerce metrics"
+on public.commerce_metrics_daily for select
+using (auth.uid() = user_id);
+
 create or replace function public.set_updated_at()
 returns trigger
 language plpgsql
@@ -265,6 +336,14 @@ create index if not exists email_verification_codes_email_idx on public.email_ve
 create index if not exists email_verification_codes_user_idx on public.email_verification_codes(user_id, created_at desc);
 create index if not exists bank_connections_user_idx on public.bank_connections(user_id, status);
 create index if not exists bank_transactions_user_date_idx on public.bank_transactions(user_id, occurred_on desc);
+create unique index if not exists bank_transactions_provider_key on public.bank_transactions(user_id, provider_transaction_id) where provider_transaction_id is not null;
 create index if not exists market_product_signals_score_idx on public.market_product_signals(score desc, created_at desc);
+create unique index if not exists market_product_signals_product_key on public.market_product_signals(product_name);
+create unique index if not exists finance_news_items_url_key on public.finance_news_items(url);
 create index if not exists finance_news_items_published_idx on public.finance_news_items(published_at desc nulls last, created_at desc);
 create index if not exists assistant_messages_user_created_idx on public.assistant_messages(user_id, created_at desc);
+create index if not exists agent_runs_agent_started_idx on public.agent_runs(agent_name, started_at desc);
+create index if not exists commerce_accounts_user_idx on public.commerce_accounts(user_id, provider, status);
+create unique index if not exists commerce_products_provider_key on public.commerce_products(user_id, provider_product_id) where provider_product_id is not null;
+create index if not exists commerce_products_user_trend_idx on public.commerce_products(user_id, trend, updated_at desc);
+create unique index if not exists commerce_metrics_daily_key on public.commerce_metrics_daily(user_id, provider, metric_day);

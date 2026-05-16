@@ -15,15 +15,17 @@ interface AuthenticatedHomeProps {
   profile: { full_name?: string | null; savings_goal?: number | string | null } | null;
   budgetEntries: Array<{ amount: number | string; entry_type: string; category: string }>;
   ideas: Array<{ product_name: string; demand_score: number; estimated_margin: number | string; status: string }>;
+  marketSignals: Array<{ name: string; signal: string; score: number; source: string }>;
+  financeNews: Array<{ title: string; source: string; href: string }>;
 }
 
-const marketSignals = [
+const defaultMarketSignals = [
   { name: "Katlanabilir seyahat çantası", signal: "Kısa video içeriklerinde tekrar eden talep", score: 87, source: "Trend Agent" },
   { name: "Mini masa süpürgesi", signal: "Ev/ofis düzeni içeriklerinde yükseliyor", score: 81, source: "Piyasa Agent" },
   { name: "Soğuk kahve başlangıç seti", signal: "Sezon öncesi arama hacmi güçleniyor", score: 76, source: "Ürün Agent" },
 ];
 
-const financeNews = [
+const defaultFinanceNews = [
   { title: "E-ticarette mikro stok yönetimi daha kritik hale geliyor", source: "Finans Haber Agent", href: "https://www.google.com/search?q=e-ticaret+stok+y%C3%B6netimi+haber" },
   { title: "KOBİ'ler için dijital ödeme maliyetleri yakından izleniyor", source: "Piyasa Haber Agent", href: "https://www.google.com/search?q=KOB%C4%B0+dijital+%C3%B6deme+maliyetleri" },
   { title: "Tüketici ilgisi düşük fiyatlı pratik ürünlere kayıyor", source: "Trend Haber Agent", href: "https://www.google.com/search?q=t%C3%BCketici+trendleri+pratik+%C3%BCr%C3%BCnler" },
@@ -67,10 +69,33 @@ export default async function HomePage({}: HomePageProps) {
 
     if (data.user) {
       const { data: profile } = await supabase.from("profiles").select("full_name, email, savings_goal").eq("id", data.user.id).single();
-      const [{ data: budgetEntries }, { data: ideas }] = await Promise.all([
+      const [{ data: budgetEntries }, { data: ideas }, { data: signalRows }, { data: newsRows }] = await Promise.all([
         supabase.from("budget_entries").select("amount, entry_type, category").eq("user_id", data.user.id),
         supabase.from("ecommerce_ideas").select("product_name, demand_score, estimated_margin, status").eq("user_id", data.user.id).order("created_at", { ascending: false }).limit(4),
+        supabase.from("market_product_signals").select("product_name, signal, score, source_url").order("score", { ascending: false }).order("created_at", { ascending: false }).limit(6),
+        supabase.from("finance_news_items").select("title, source, url").order("published_at", { ascending: false }).order("created_at", { ascending: false }).limit(6),
       ]);
+      const marketSignals = (signalRows ?? []).map((row) => {
+        let source = "Piyasa Agent";
+        if (row.source_url) {
+          try {
+            source = new URL(row.source_url).hostname.replace("www.", "");
+          } catch {
+            source = "Piyasa Agent";
+          }
+        }
+        return {
+          name: row.product_name,
+          signal: row.signal,
+          score: row.score,
+          source,
+        };
+      });
+      const financeNews = (newsRows ?? []).map((row) => ({
+        title: row.title,
+        source: row.source,
+        href: row.url,
+      }));
       const resolvedUserName = profile?.full_name?.split(" ")[0] ?? profile?.email ?? data.user.email ?? "Profil";
       userName = resolvedUserName;
       authenticatedHome = {
@@ -78,6 +103,8 @@ export default async function HomePage({}: HomePageProps) {
         profile,
         budgetEntries: budgetEntries ?? [],
         ideas: ideas ?? [],
+        marketSignals: marketSignals.length > 0 ? marketSignals : defaultMarketSignals,
+        financeNews: financeNews.length > 0 ? financeNews : defaultFinanceNews,
       };
     }
   } catch {
@@ -100,7 +127,7 @@ export default async function HomePage({}: HomePageProps) {
   );
 }
 
-function AuthenticatedHome({ userName, profile, budgetEntries, ideas }: AuthenticatedHomeProps) {
+function AuthenticatedHome({ userName, profile, budgetEntries, ideas, marketSignals, financeNews }: AuthenticatedHomeProps) {
   const income = budgetEntries.filter((entry) => entry.entry_type === "income").reduce((sum, entry) => sum + Number(entry.amount), 0);
   const expenses = budgetEntries.filter((entry) => entry.entry_type === "expense").reduce((sum, entry) => sum + Number(entry.amount), 0);
   const savings = budgetEntries.filter((entry) => entry.entry_type === "saving").reduce((sum, entry) => sum + Number(entry.amount), 0);
@@ -156,8 +183,8 @@ function AuthenticatedHome({ userName, profile, budgetEntries, ideas }: Authenti
           </section>
 
           <div className="mt-6 grid gap-6 lg:grid-cols-2">
-            <AgentMarketSection />
-            <AgentNewsSection />
+            <AgentMarketSection marketSignals={marketSignals} />
+            <AgentNewsSection financeNews={financeNews} />
           </div>
 
           <section id="spending" className="mt-6 rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl sm:p-8">
@@ -201,7 +228,7 @@ function AuthenticatedHome({ userName, profile, budgetEntries, ideas }: Authenti
   );
 }
 
-function AgentMarketSection() {
+function AgentMarketSection({ marketSignals }: { marketSignals: Array<{ name: string; signal: string; score: number; source: string }> }) {
   return (
     <section id="market" className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl sm:p-8">
       <div className="flex items-center gap-3">
@@ -226,7 +253,7 @@ function AgentMarketSection() {
   );
 }
 
-function AgentNewsSection() {
+function AgentNewsSection({ financeNews }: { financeNews: Array<{ title: string; source: string; href: string }> }) {
   return (
     <section id="news" className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl sm:p-8">
       <div className="flex items-center gap-3">
