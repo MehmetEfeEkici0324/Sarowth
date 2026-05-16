@@ -1,9 +1,5 @@
-import { SessionsClient, protos } from "@google-cloud/dialogflow-cx";
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-
-type JsonPrimitive = string | number | boolean | null;
-type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
 
 interface AssistantRequest {
   message?: string;
@@ -11,44 +7,103 @@ interface AssistantRequest {
   userName?: string;
 }
 
-interface BankaAgentVerisi {
-  bankaAdi: string;
-  hesapTuru: string;
-  bakiye: number;
-  aylikGelir: number;
-  aylikGider: number;
-  kullanilabilirAlan: number;
-  riskSeviyesi: "dusuk" | "orta" | "yuksek";
-  harcamaKategorileri: Array<{
-    kategori: string;
-    tutar: number;
-    oran: number;
-  }>;
-  sonGuncelleme: string;
+interface BankaVerisi {
+  bakiye: string;
+  aylikHarcama: string;
+  enCokHarcatilanKategori: string;
+  sonHarekeler: string[];
 }
 
-interface TrendUrunVerisi {
+interface TrendUrunu {
   title: string;
   description: string;
   score: string;
   source: string;
 }
 
-interface FinansHaberiVerisi {
+interface FinansHaberi {
   title: string;
   source: string;
   url: string;
 }
 
-interface DialogflowConfig {
-  projectId: string;
-  location: string;
-  agentId: string;
+interface TokenResponse {
+  access_token?: string;
+  error?: string;
+  error_description?: string;
 }
 
-function readDialogflowConfig(): DialogflowConfig {
-  const projectId = process.env.DIALOGFLOW_CX_PROJECT_ID ?? process.env.GOOGLE_CLOUD_PROJECT_ID;
-  const location = process.env.DIALOGFLOW_CX_LOCATION ?? "global";
+interface DialogflowResponse {
+  queryResult?: {
+    responseMessages?: Array<{
+      text?: {
+        text?: string[];
+      };
+    }>;
+  };
+  error?: {
+    message?: string;
+    status?: string;
+  };
+}
+
+async function bankaAgentYuvasi(userId: string): Promise<BankaVerisi> {
+  void userId;
+
+  return {
+    bakiye: "4,250 TL",
+    aylikHarcama: "12,800 TL",
+    enCokHarcatilanKategori: "E-Ticaret / Giyim",
+    sonHarekeler: ["Amazon.com.tr - 1,200 TL", "Hepsiburada - 450 TL"],
+  };
+}
+
+async function trendUrunlerYuvasi(): Promise<TrendUrunu[]> {
+  return [
+    { title: "Katlanabilir seyahat çantası", description: "Kısa video içeriklerinde tekrar eden talep", score: "87/100", source: "Trend Agent" },
+    { title: "Mini masa süpürgesi", description: "Ev/ofis düzeni içeriklerinde yükseliyor", score: "81/100", source: "Piyasa Agent" },
+    { title: "Soğuk kahve başlangıç seti", description: "Sezon öncesi arama hacmi güçleniyor", score: "76/100", source: "Ürün Agent" },
+  ];
+}
+
+async function haberTrendYuvasi(): Promise<FinansHaberi[]> {
+  return [
+    { title: "E-ticarette mikro stok yönetimi daha kritik hale geliyor", source: "Finans Haber Agent", url: "https://bloomberght.com" },
+    { title: "KOBİ'ler için dijital ödeme maliyetleri yakından izleniyor", source: "Piyasa Haber Agent", url: "https://reuters.com" },
+    { title: "Tüketici ilgisi düşük fiyatlı pratik ürünlere kayıyor", source: "Trend Haber Agent", url: "https://trendhunter.com" },
+  ];
+}
+
+async function getGoogleAccessToken() {
+  const refreshToken = process.env.GOOGLE_REFRESH_TOKEN?.trim();
+
+  if (!refreshToken) {
+    throw new Error("GOOGLE_REFRESH_TOKEN ortam değişkeni eksik.");
+  }
+
+  const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "refresh_token",
+      client_id: "32555940559.apps.googleusercontent.com",
+      refresh_token: refreshToken,
+    }),
+  });
+
+  const tokenData = (await tokenResponse.json()) as TokenResponse;
+
+  if (!tokenResponse.ok || !tokenData.access_token) {
+    console.error("GOOGLE TOKEN ERROR:", tokenData);
+    throw new Error(tokenData.error_description || tokenData.error || "Google access token üretilemedi.");
+  }
+
+  return tokenData.access_token;
+}
+
+function readDialogflowConfig() {
+  const projectId = process.env.DIALOGFLOW_CX_PROJECT_ID;
+  const location = process.env.DIALOGFLOW_CX_LOCATION || "global";
   const agentId = process.env.DIALOGFLOW_CX_AGENT_ID;
 
   if (!projectId || !agentId) {
@@ -58,111 +113,40 @@ function readDialogflowConfig(): DialogflowConfig {
   return { projectId, location, agentId };
 }
 
-function valueToProtoValue(value: JsonValue): protos.google.protobuf.IValue {
-  if (value === null) return { nullValue: "NULL_VALUE" };
-  if (typeof value === "string") return { stringValue: value };
-  if (typeof value === "number") return { numberValue: value };
-  if (typeof value === "boolean") return { boolValue: value };
-  if (Array.isArray(value)) {
-    return {
-      listValue: {
-        values: value.map((item) => valueToProtoValue(item)),
-      },
-    };
-  }
-
-  return { structValue: objectToStruct(value) };
+function getDialogflowEndpoint(projectId: string, location: string, agentId: string, userId: string) {
+  const sessionId = `sarowth-session-${userId.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+  return `https://${location}-dialogflow.googleapis.com/v3/projects/${projectId}/locations/${location}/agents/${agentId}/sessions/${sessionId}:detectIntent`;
 }
 
-function objectToStruct(value: { [key: string]: JsonValue }): protos.google.protobuf.IStruct {
-  return {
-    fields: Object.fromEntries(Object.entries(value).map(([key, item]) => [key, valueToProtoValue(item)])),
-  };
-}
-
-async function bankaAgentYuvasi(userId: string): Promise<BankaAgentVerisi> {
-  const userSeed = userId.split("").reduce((sum, char) => sum + char.charCodeAt(0), 0);
-  const aylikGelir = 42000 + (userSeed % 8) * 1250;
-  const aylikGider = 26300 + (userSeed % 6) * 900;
-  const bakiye = 18450 + (userSeed % 10) * 700;
-
-  return {
-    bankaAdi: "Garanti BBVA",
-    hesapTuru: "Vadesiz TL Hesabı",
-    bakiye,
-    aylikGelir,
-    aylikGider,
-    kullanilabilirAlan: Math.max(0, aylikGelir - aylikGider),
-    riskSeviyesi: aylikGider / aylikGelir > 0.75 ? "yuksek" : aylikGider / aylikGelir > 0.55 ? "orta" : "dusuk",
-    harcamaKategorileri: [
-      { kategori: "Mutfak", tutar: 8200, oran: 31 },
-      { kategori: "Abonelik", tutar: 1850, oran: 7 },
-      { kategori: "Ulaşım", tutar: 3600, oran: 14 },
-      { kategori: "Giyim", tutar: 2900, oran: 11 },
-      { kategori: "Kira ve Faturalar", tutar: 9750, oran: 37 },
-    ],
-    sonGuncelleme: new Date().toISOString(),
-  };
-}
-
-async function trendUrunlerYuvasi(): Promise<TrendUrunVerisi[]> {
-  return [
-    { title: "Katlanabilir seyahat çantası", description: "Kısa video içeriklerinde tekrar eden talep", score: "87/100", source: "Trend Agent" },
-    { title: "Mini masa süpürgesi", description: "Ev/ofis düzeni içeriklerinde yükseliyor", score: "81/100", source: "Piyasa Agent" },
-    { title: "Soğuk kahve başlangıç seti", description: "Sezon öncesi arama hacmi güçleniyor", score: "76/100", source: "Ürün Agent" },
-  ];
-}
-
-async function haberTrendYuvasi(): Promise<FinansHaberiVerisi[]> {
-  return [
-    { title: "E-ticarette mikro stok yönetimi daha kritik hale geliyor", source: "Finans Haber Agent", url: "https://bloomberght.com" },
-    { title: "KOBİ'ler için dijital ödeme maliyetleri yakından izleniyor", source: "Piyasa Haber Agent", url: "https://reuters.com" },
-    { title: "Tüketici ilgisi düşük fiyatlı pratik ürünlere kayıyor", source: "Trend Haber Agent", url: "https://trendhunter.com" },
-  ];
-}
-
-async function resolveRequestIdentity(body: AssistantRequest) {
+async function resolveIdentity(body: AssistantRequest) {
   const supabase = await createSupabaseServerClient();
-  const { data: userData } = await supabase.auth.getUser();
-  const authUserId = userData.user?.id;
-  const userId = body.userId ?? authUserId;
+  const { data } = await supabase.auth.getUser();
+  const userId = body.userId || data.user?.id;
 
   if (!userId) {
     return { supabase, userId: null, userName: null };
   }
 
-  if (body.userName) {
-    return { supabase, userId, userName: body.userName };
+  if (body.userName?.trim()) {
+    return { supabase, userId, userName: body.userName.trim() };
   }
 
   const { data: profile } = await supabase.from("profiles").select("full_name, email").eq("id", userId).single();
-  const userName = profile?.full_name?.trim() || profile?.email || userData.user?.email || "Sarowth kullanıcısı";
+  const userName = profile?.full_name?.trim() || profile?.email || data.user?.email || "Mehmet Efe";
 
   return { supabase, userId, userName };
 }
 
-function buildDialogflowClient() {
-  const credentials = process.env.GOOGLE_REFRESH_TOKEN ? {
-    type: "authorized_user" as const,
-    client_id: "32555940559.apps.googleusercontent.com",
-    refresh_token: process.env.GOOGLE_REFRESH_TOKEN.trim(),
-  } : undefined;
-
-  if (credentials) {
-    return new SessionsClient({
-      credentials,
-    });
-  }
-
-  return new SessionsClient();
+function extractAgentReply(dfData: DialogflowResponse) {
+  return dfData.queryResult?.responseMessages?.[0]?.text?.text?.[0] || "Asistan şu an harcamalarını analiz ediyor...";
 }
 
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as AssistantRequest;
-    const message = body.message?.trim();
+    const userMessage = body.message?.trim();
 
-    if (!message) {
+    if (!userMessage) {
       return NextResponse.json({
         success: false,
         reply: "Bana bütçen, satın alma kararın veya ürün fikrinle ilgili bir soru sorabilirsin.",
@@ -170,7 +154,7 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
-    const { supabase, userId, userName } = await resolveRequestIdentity(body);
+    const { supabase, userId, userName } = await resolveIdentity(body);
 
     if (!userId || !userName) {
       return NextResponse.json({
@@ -180,79 +164,75 @@ export async function POST(request: Request) {
       }, { status: 401 });
     }
 
-    const dialogflowConfig = readDialogflowConfig();
+    const { projectId, location, agentId } = readDialogflowConfig();
+    const accessToken = await getGoogleAccessToken();
     const bankaVerisi = await bankaAgentYuvasi(userId);
-    const trendUrunler = await trendUrunlerYuvasi();
-    const finansHaberleri = await haberTrendYuvasi();
-    const client = buildDialogflowClient();
-    const sessionPath = client.projectLocationAgentSessionPath(
-      dialogflowConfig.projectId,
-      dialogflowConfig.location,
-      dialogflowConfig.agentId,
-      `sarowth-session-${userId}`,
-    );
+    const url = getDialogflowEndpoint(projectId, location, agentId, userId);
 
     await supabase.from("assistant_messages").insert({
       user_id: userId,
       role: "user",
-      content: message,
+      content: userMessage,
     });
 
-    const parameters = objectToStruct({
-      userId,
-      userName,
-      user_name: userName,
-      bankaAdi: bankaVerisi.bankaAdi,
-      hesapTuru: bankaVerisi.hesapTuru,
-      bakiye: bankaVerisi.bakiye,
-      aylikGelir: bankaVerisi.aylikGelir,
-      aylikGider: bankaVerisi.aylikGider,
-      kullanilabilirAlan: bankaVerisi.kullanilabilirAlan,
-      riskSeviyesi: bankaVerisi.riskSeviyesi,
-      harcamaKategorileri: bankaVerisi.harcamaKategorileri as unknown as JsonValue,
-      trendUrunler: trendUrunler as unknown as JsonValue,
-      finansHaberleri: finansHaberleri as unknown as JsonValue,
-    });
-
-    const [dialogflowResponse] = await client.detectIntent({
-      session: sessionPath,
-      queryInput: {
-        text: { text: message },
-        languageCode: "tr",
+    const dfResponse = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
       },
-      queryParams: {
-        parameters,
-      },
+      body: JSON.stringify({
+        queryInput: {
+          text: { text: userMessage },
+          languageCode: "tr",
+        },
+        queryParams: {
+          payload: {
+            user_name: userName,
+            user_id: userId,
+            banka: bankaVerisi,
+          },
+        },
+      }),
     });
 
-    const reply = dialogflowResponse.queryResult?.responseMessages
-      ?.flatMap((responseMessage) => responseMessage.text?.text ?? [])
-      .filter(Boolean)
-      .join("\n\n") || "Şu anda net bir cevap üretemedim. Sorunu biraz daha detaylandırır mısın?";
+    const dfData = (await dfResponse.json()) as DialogflowResponse;
+
+    if (!dfResponse.ok) {
+      console.error("DIALOGFLOW DETECT INTENT ERROR:", dfData);
+      throw new Error(dfData.error?.message || `Dialogflow detectIntent başarısız: ${dfResponse.status}`);
+    }
+
+    const agentResponseText = extractAgentReply(dfData);
 
     await supabase.from("assistant_messages").insert({
       user_id: userId,
       role: "assistant",
-      content: reply,
+      content: agentResponseText,
     });
 
     return NextResponse.json({
       success: true,
-      reply,
+      reply: agentResponseText,
       dashboardData: {
         banka: bankaVerisi,
-        trendUrunler,
-        finansHaberleri,
+        trendUrunler: await trendUrunlerYuvasi(),
+        finansHaberleri: await haberTrendYuvasi(),
       },
     });
   } catch (error) {
     console.error("CRITICAL RUNTIME ERROR:", error);
+
     const message = error instanceof Error ? error.message : "Asistan çalıştırılırken bilinmeyen bir hata oluştu.";
 
     return NextResponse.json({
       success: false,
-      reply: "Asistan şu anda yanıt veremiyor. Dialogflow CX bağlantı ve ortam değişkenlerini kontrol et.",
-      dashboardData: null,
+      reply: "Asistan şu anda yanıt veremiyor. Dialogflow CX bağlantı, refresh token ve ortam değişkenlerini kontrol et.",
+      dashboardData: {
+        banka: null,
+        trendUrunler: await trendUrunlerYuvasi(),
+        finansHaberleri: await haberTrendYuvasi(),
+      },
       error: message,
     }, { status: 500 });
   }
