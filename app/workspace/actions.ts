@@ -4,6 +4,12 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getWorkspace } from "@/lib/auth";
 
+const allowedBudgetCategories: Record<string, string[]> = {
+  income: ["Maaş", "Ek iş", "Satış geliri", "İade", "Diğer gelir"],
+  expense: ["Market", "Yemek", "Ulaşım", "Kira", "Fatura", "Abonelik", "E-Ticaret / Giyim", "Sağlık", "Eğitim", "Borç", "Diğer gider"],
+  saving: ["Acil durum", "Yatırım bütçesi", "Ürün test bütçesi", "Birikim hesabı", "Diğer birikim"],
+};
+
 export async function updateProfile(formData: FormData) {
   const { supabase, user } = await getWorkspace();
   const fullName = String(formData.get("fullName") ?? "").trim();
@@ -39,7 +45,9 @@ export async function addBudgetEntry(formData: FormData) {
   const entryType = String(formData.get("entryType") ?? "expense");
   const amount = Number(formData.get("amount") ?? 0);
 
-  if (!label || !category || !Number.isFinite(amount) || amount <= 0) {
+  const allCategories = Object.values(allowedBudgetCategories).flat();
+
+  if (!label || !allowedBudgetCategories[entryType] || !allCategories.includes(category) || !Number.isFinite(amount) || amount <= 0) {
     return;
   }
 
@@ -55,6 +63,7 @@ export async function addBudgetEntry(formData: FormData) {
 
   revalidatePath("/budget");
   revalidatePath("/dashboard");
+  revalidatePath("/");
 }
 
 export async function addEcommerceIdea(formData: FormData) {

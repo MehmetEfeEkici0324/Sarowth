@@ -38,10 +38,10 @@ const investmentIdeas = [
 ];
 
 const agentConnections = [
-  { name: "Banka Agent", status: "Hazır", detail: "Gelir, gider, kart hareketleri ve kategori dağılımını çeker." },
-  { name: "Haber Agent", status: "Hazır", detail: "Finans ve e-ticaret haberlerinden fırsat sinyali çıkarır." },
-  { name: "Piyasa Agent", status: "Hazır", detail: "Popülerleşen ürünleri ve talep artışlarını izler." },
-  { name: "Ticari Hesap Agent", status: "Planlandı", detail: "Shopier, Shopify ve Midas gibi hesaplardan kar/zarar okur." },
+  { name: "Bütçe Motoru", status: "Hazır", detail: "Panelden girilen gelir, gider ve kategorileri kişiye özel karar bağlamına çevirir." },
+  { name: "Haber Agent", status: "API bekliyor", detail: "Kullanıcının aradığı konuları takip edip günlük haber bundle'larına dönüştürecek." },
+  { name: "Trend/Tedarik Agent", status: "API bekliyor", detail: "Moda olmaya başlayan ürünleri ve tedarik linklerini bundle olarak gösterecek." },
+  { name: "Gemini Agent", status: "API bekliyor", detail: "Chat komutlarını doğal dile ve kişisel finans stratejisine çevirecek." },
 ];
 
 const statusLabels: Record<string, string> = {
@@ -152,7 +152,7 @@ function AuthenticatedHome({ userName, profile, budgetEntries, ideas, marketSign
             <div className="rounded-[2rem] border border-white/10 bg-white/[0.05] p-6 backdrop-blur-xl sm:p-8">
               <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-300">Kişisel Ana Sayfa</p>
               <h1 className="mt-4 max-w-3xl text-4xl font-semibold tracking-[-0.05em] sm:text-6xl">Hoş geldin, {profile?.full_name?.split(" ")[0] ?? userName}.</h1>
-              <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-300">Banka, haber, piyasa ve ticari hesap agent'ları veriyi getirir. Gemini asistan bu verilerle alışveriş, tasarruf ve kar geliştirme kararlarında sana kişisel destek verir.</p>
+               <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-300">Gelir-gider kayıtların, haber/trend sinyalleri ve ürün takiplerin tek yerde birleşir. Asistan, sadece chatte sorduğunda bütçene göre karar desteği verir.</p>
               <div className="mt-7 flex flex-col gap-3 sm:flex-row">
                 <a href="#assistant" className="rounded-full bg-gradient-to-r from-emerald-400 to-blue-500 px-6 py-3 text-center font-semibold text-[#03110c]">Asistana Sor</a>
                 <a href="#agents" className="rounded-full border border-white/10 bg-white/[0.04] px-6 py-3 text-center font-semibold text-white transition hover:bg-white/10">Agent Durumlarını Gör</a>
@@ -170,7 +170,7 @@ function AuthenticatedHome({ userName, profile, budgetEntries, ideas, marketSign
               <PlugZap className="text-emerald-300" size={22} />
               <h2 className="text-3xl font-semibold tracking-[-0.04em]">Agent bağlantı katmanı</h2>
             </div>
-            <p className="mt-3 max-w-3xl leading-7 text-slate-400">Kullanıcı veri girmek zorunda kalmaz. Bu bağlantılar aktif olduğunda banka, haber, piyasa ve ticari hesap verileri anlık olarak çekilip Gemini asistanına bağlam olur.</p>
+             <p className="mt-3 max-w-3xl leading-7 text-slate-400">Şimdilik banka verisini panelden sen girersin. Haber, trend/tedarik ve Gemini API bağlantıları eklendiğinde bu katman otomatik agent akışına dönüşür.</p>
             <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               {agentConnections.map((agent) => (
                 <div key={agent.name} className="rounded-3xl border border-white/10 bg-black/25 p-5">
@@ -193,14 +193,14 @@ function AuthenticatedHome({ userName, profile, budgetEntries, ideas, marketSign
                   <Landmark className="text-emerald-300" size={22} />
                   <h2 className="text-3xl font-semibold tracking-[-0.04em]">Banka ve harcama görünümü</h2>
                 </div>
-                <p className="mt-3 max-w-3xl leading-7 text-slate-400">Banka agent gelirini, giderini, önceki ay harcamalarını ve bu ayki kategori dağılımını anlık çeker. Gemini asistan satın alma kararlarını bu tabloya göre yorumlar.</p>
+                 <p className="mt-3 max-w-3xl leading-7 text-slate-400">Panelden girdiğin gelir, gider, birikim ve kategori kayıtları burada özetlenir. Chat asistanı satın alma kararlarını bu tabloya göre yorumlar.</p>
               </div>
               <a href="#assistant" className="rounded-full border border-white/10 px-5 py-3 text-center text-sm font-semibold text-white transition hover:bg-white/10">Satın Alma Sor</a>
             </div>
             <div className="mt-6 grid gap-6 lg:grid-cols-[0.75fr_1.25fr] lg:items-center">
               <SpendingDonut categories={expenseByCategory} total={expenses} />
               <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-1">
-                <StatCard label="Toplam gelir" value={`₺${income.toLocaleString()}`} detail="Banka agent ile otomatik gelir toplamı." />
+                <StatCard label="Toplam gelir" value={`₺${income.toLocaleString()}`} detail="Panelden kaydedilen gelir toplamı." />
                 <StatCard label="Toplam gider" value={`₺${expenses.toLocaleString()}`} detail="Bu ayki harcama toplamı." />
                 <StatCard label="Toplam tasarruf" value={`₺${savings.toLocaleString()}`} detail="Geçen aydan veya bu aydan ayrılan tutar." />
               </div>
@@ -209,7 +209,7 @@ function AuthenticatedHome({ userName, profile, budgetEntries, ideas, marketSign
               {expenseByCategory.length > 0 ? expenseByCategory.slice(0, 5).map(([category, amount]) => {
                 const percent = expenses > 0 ? Math.round((amount / expenses) * 100) : 0;
                 return <CategoryBar key={category} category={category} amount={amount} percent={percent} />;
-              }) : <p className="rounded-2xl border border-white/10 bg-black/25 p-4 text-slate-400">Banka agent bağlantısı aktif olduğunda kategori grafiği gerçek harcamalarınla dolacak. Şimdilik örnek dağılım gösteriliyor.</p>}
+              }) : <p className="rounded-2xl border border-white/10 bg-black/25 p-4 text-slate-400">Kategori grafiği için önce panelden gelir ve gider kayıtlarını ekle.</p>}
             </div>
           </section>
 

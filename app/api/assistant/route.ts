@@ -4,323 +4,243 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 interface AssistantRequest {
   message?: string;
   userMessage?: string;
-  userId?: string;
-  userName?: string;
 }
 
-interface BankaVerisi {
-  bakiye: string;
-  aylikHarcama: string;
-  enCokHarcatilanKategori: string;
-  sonHarekeler: string[];
-  nakitAkisi: {
-    KalanSerbestBütce: string;
-  };
-  hesapOzet: {
-    hesapSahibi: string;
-    bankaAdi: string;
-    bakiye: string;
-    kullanilabilirEsnekAlan: string;
-  };
-  kategoriAnalizi: {
-    kategoriLimitleri: Array<{
-      kategori: string;
-      limit: string;
-      mevcut: string;
-      harcanan: string;
-      durum: "LIMIT_ASILDI" | "NORMAL";
-    }>;
-  };
+interface BudgetEntry {
+  label: string;
+  category: string;
+  amount: number | string;
+  entry_type: "income" | "expense" | "saving";
+  occurred_on?: string;
 }
 
-interface TrendUrunu {
-  title: string;
-  description: string;
-  score: string;
-  source: string;
+interface MarketSignal {
+  product_name: string;
+  signal: string;
+  score: number;
+  source_url?: string | null;
 }
 
-interface FinansHaberi {
+interface NewsItem {
   title: string;
   source: string;
   url: string;
-  time: string;
-  bundleSummary: string;
+  summary?: string | null;
 }
 
-interface Rss2JsonItem {
-  title?: string;
-  link?: string;
+interface SupplierLink {
+  product_name: string;
+  title: string;
+  url: string;
+  source: string;
+  price_text?: string | null;
+  score: number;
 }
 
-interface Rss2JsonResponse {
-  feed?: {
-    title?: string;
-  };
-  items?: Rss2JsonItem[];
+const commandHelp = `Komutlar:
+/al Ürün adı 1200 TL - Satın alma kararını bütçene göre hesaplar.
+/haber konu - Haber agent verilerinde konuyla ilgili sinyal arar.
+/takip ürün adı - Ürün/trend takibi için arama niyetini analiz eder.
+/yatirim bütçe - Oluşan fazla bütçeyle bakılabilecek alanları listeler. Yatırım tavsiyesi değildir.
+/ozet - Gelir, gider, tasarruf ve en yüksek harcama kategorini özetler.`;
+
+function parseAmount(message: string) {
+  const normalized = message.replace(/\./g, "").replace(/,/g, ".");
+  const match = normalized.match(/(\d+(?:\.\d+)?)/);
+  return match ? Number(match[1]) : null;
 }
 
-interface TokenResponse {
-  access_token?: string;
-  error?: string;
-  error_description?: string;
+function parseCommand(message: string) {
+  const trimmed = message.trim();
+  const command = trimmed.match(/^\/(\S+)/)?.[1]?.toLowerCase() ?? "yardim";
+  const text = trimmed.replace(/^\/\S+\s*/, "").trim();
+  return { command, text };
 }
 
-interface DialogflowResponse {
-  queryResult?: {
-    responseMessages?: Array<{
-      text?: {
-        text?: string[];
-      };
-    }>;
-  };
-  error?: {
-    message?: string;
-    status?: string;
-  };
+function buildBudgetSummary(entries: BudgetEntry[]) {
+  const income = entries.filter((entry) => entry.entry_type === "income").reduce((sum, entry) => sum + Number(entry.amount), 0);
+  const expenses = entries.filter((entry) => entry.entry_type === "expense").reduce((sum, entry) => sum + Number(entry.amount), 0);
+  const savings = entries.filter((entry) => entry.entry_type === "saving").reduce((sum, entry) => sum + Number(entry.amount), 0);
+  const available = Math.max(0, income - expenses - savings);
+  const expenseByCategory = entries.filter((entry) => entry.entry_type === "expense").reduce<Record<string, number>>((groups, entry) => {
+    groups[entry.category] = (groups[entry.category] ?? 0) + Number(entry.amount);
+    return groups;
+  }, {});
+  const topCategory = Object.entries(expenseByCategory).sort((a, b) => b[1] - a[1])[0] ?? null;
+
+  return { income, expenses, savings, available, expenseByCategory, topCategory };
 }
 
-async function bankaAgentYuvasi(userId: string, userName: string): Promise<BankaVerisi> {
-  void userId;
-  const hesapSahibi = userName || "Kullanıcı";
+function getPurchaseDecision(amount: number, summary: ReturnType<typeof buildBudgetSummary>) {
+  if (summary.income === 0) {
+    return "Karar: BEKLE\n\nHenüz gelir kaydı yok. Gelir ve giderlerini panelden girdikten sonra bu alışveriş için net karar verebilirim.";
+  }
 
+  const availableAfterPurchase = summary.available - amount;
+  const expenseRatio = summary.income > 0 ? summary.expenses / summary.income : 1;
+  const topCategoryText = summary.topCategory ? `Bu ay en yüksek harcama kategorin ${summary.topCategory[0]}: ₺${summary.topCategory[1].toLocaleString("tr-TR")}.` : "Henüz baskın bir harcama kategorisi görünmüyor.";
+
+  if (amount > summary.available || availableAfterPurchase < summary.income * 0.08 || expenseRatio > 0.8) {
+    return `Karar: ALMA\n\nBu alışveriş bütçeni güvenli alanın dışına çıkarıyor. ${topCategoryText} Tasarruf hedefini korumak için bu ay beklemen daha doğru.`;
+  }
+
+  if (amount > summary.available * 0.45 || expenseRatio > 0.65) {
+    return `Karar: BEKLE\n\nAlabilecek gibi görünüyorsun ama bu tutar serbest bütçenin büyük kısmını kullanır. ${topCategoryText} 7 gün bekleyip daha ucuz alternatif veya indirim kontrolü yap.`;
+  }
+
+  return `Karar: ALINABİLİR\n\nGüvenli bölgedesin. Bu alışveriş sonrası yaklaşık ₺${availableAfterPurchase.toLocaleString("tr-TR")} serbest alan kalır. Yine de aşırıya kaçma ve aynı kategoriden tekrar harcama yapmadan önce bütçeni kontrol et.`;
+}
+
+function filterNews(query: string, news: NewsItem[]) {
+  const normalizedQuery = query.toLocaleLowerCase("tr-TR");
+  const filtered = news.filter((item) => `${item.title} ${item.summary ?? ""}`.toLocaleLowerCase("tr-TR").includes(normalizedQuery)).slice(0, 3);
+  return filtered.length > 0 ? filtered : news.slice(0, 3);
+}
+
+function buildNewsReply(query: string, news: NewsItem[]) {
+  const items = filterNews(query, news);
+  if (items.length === 0) {
+    return "Haber agent verisi henüz boş. Haber API bağlandığında bu komut günlük sinyalleri konuya göre getirecek.";
+  }
+
+  return `Haber Bundle: ${query || "genel piyasa"}\n\n${items.map((item, index) => `${index + 1}. ${item.title}\nKaynak: ${item.source}\nLink: ${item.url}`).join("\n\n")}\n\nAjan notu: Bu sinyaller karar desteği içindir; tek başına yatırım veya stok alma kararı değildir.`;
+}
+
+function buildTrackingReply(query: string, signals: MarketSignal[], suppliers: SupplierLink[]) {
+  const matched = signals.filter((item) => `${item.product_name} ${item.signal}`.toLocaleLowerCase("tr-TR").includes(query.toLocaleLowerCase("tr-TR"))).slice(0, 3);
+  const items = matched.length > 0 ? matched : signals.slice(0, 3);
+  const supplierItems = suppliers.filter((item) => `${item.product_name} ${item.title}`.toLocaleLowerCase("tr-TR").includes(query.toLocaleLowerCase("tr-TR"))).slice(0, 4);
+
+  if (items.length === 0) {
+    return `Takip başlatıldı: ${query}\n\nPiyasa API bağlandığında bu ürünle ilgili trend, tedarik ve satış linkleri günlük olarak bundle halinde gösterilecek.`;
+  }
+
+  const supplierText = supplierItems.length > 0 ? `\n\nTedarik linkleri:\n${supplierItems.map((item) => `- ${item.title} (${item.source}${item.price_text ? `, ${item.price_text}` : ""})\n  ${item.url}`).join("\n")}` : "\n\nTedarik linkleri: Ürün tedarik API bağlanınca burada listelenecek.";
+
+  return `Ürün/Trend Bundle: ${query}\n\n${items.map((item) => `- ${item.product_name}: ${item.signal} (${item.score}/100)${item.source_url ? `\n  Kaynak: ${item.source_url}` : ""}`).join("\n")}${supplierText}\n\nAjan notu: Tedarik için önce düşük bütçeli talep testi yap; stok almadan önce fiyat, kargo ve iade riskini hesapla.`;
+}
+
+function buildInvestmentReply(summary: ReturnType<typeof buildBudgetSummary>) {
+  if (summary.available <= 0) {
+    return "Yatırım fırsatı alanı: YOK\n\nBu ay serbest bütçe görünmüyor. Önce giderleri azaltıp acil nakit alanı oluştur. Bu yatırım tavsiyesi değildir.";
+  }
+
+  return `Bakılabilecek alanlar: ₺${summary.available.toLocaleString("tr-TR")} serbest bütçe\n\n- %50 acil nakit tamponu\n- %30 düşük bütçeli ürün/reklam testi\n- %20 eğitim, araç veya araştırma bütçesi\n\nHisse, fon, coin veya benzeri alanlar için bu yatırım tavsiyesi değildir. Sadece bakılabilecek risk alanlarını ayırıyorum.`;
+}
+
+function buildDashboardData(summary: ReturnType<typeof buildBudgetSummary>, signals: MarketSignal[], news: NewsItem[]) {
   return {
-    bakiye: "4,250 TL",
-    aylikHarcama: "12,800 TL",
-    enCokHarcatilanKategori: "E-Ticaret / Giyim",
-    sonHarekeler: ["Amazon.com.tr - 1,200 TL", "Hepsiburada - 450 TL"],
-    nakitAkisi: {
-      KalanSerbestBütce: "1,450 TL",
+    banka: {
+      gelir: summary.income,
+      gider: summary.expenses,
+      tasarruf: summary.savings,
+      serbestButce: summary.available,
+      enYuksekKategori: summary.topCategory?.[0] ?? "Yok",
     },
-    hesapOzet: {
-      hesapSahibi,
-      bankaAdi: "Sarowth Merkez Bankası SIM",
-      bakiye: "4,250.00 TL",
-      kullanilabilirEsnekAlan: "Kısıtlı",
-    },
-    kategoriAnalizi: {
-      kategoriLimitleri: [
-        { kategori: "E-Ticaret / Giyim", limit: "2,500 TL", mevcut: "3,150 TL", harcanan: "3,150 TL", durum: "LIMIT_ASILDI" },
-        { kategori: "Mutfak", limit: "7,500 TL", mevcut: "6,900 TL", harcanan: "6,900 TL", durum: "NORMAL" },
-      ],
-    },
+    trendUrunler: signals.slice(0, 3).map((item) => {
+      let source = "Piyasa Agent";
+      if (item.source_url) {
+        try {
+          source = new URL(item.source_url).hostname.replace("www.", "");
+        } catch {
+          source = "Piyasa Agent";
+        }
+      }
+      return {
+        title: item.product_name,
+        description: item.signal,
+        score: `${item.score}/100`,
+        source,
+      };
+    }),
+    finansHaberleri: news.slice(0, 3).map((item) => ({
+      title: item.title,
+      source: item.source,
+      url: item.url,
+      time: "Günlük sinyal",
+      bundleSummary: item.summary ? `AJAN NOTU: ${item.summary}` : "AJAN NOTU: Günlük haber sinyali izleniyor; ürün, bütçe veya yatırım kararı için tek başına yeterli değildir.",
+    })),
   };
 }
 
-async function trendUrunlerYuvasi(): Promise<TrendUrunu[]> {
-  return [
-    { title: "Katlanabilir seyahat çantası", description: "Kısa video içeriklerinde tekrar eden talep", score: "87/100", source: "Trend Agent" },
-    { title: "Mini masa süpürgesi", description: "Ev/ofis düzeni içeriklerinde yükseliyor", score: "81/100", source: "Piyasa Agent" },
-    { title: "Soğuk kahve başlangıç seti", description: "Sezon öncesi arama hacmi güçleniyor", score: "76/100", source: "Ürün Agent" },
-  ];
-}
+async function rememberWatchTopic(supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>, userId: string, topic: string, intent: "product_watch" | "news_watch" | "investment_watch") {
+  const normalizedTopic = topic.trim();
+  if (!normalizedTopic) return;
 
-async function haberTrendYuvasi(bankaData: BankaVerisi, userName: string): Promise<FinansHaberi[]> {
-  try {
-    const displayName = userName || bankaData?.hesapOzet?.hesapSahibi || "Değerli Sarowth Kullanıcısı";
-    const rssTargetUrl = encodeURIComponent("https://www.webrazzi.com/feed");
-    const agentApiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${rssTargetUrl}`;
-    const response = await fetch(agentApiUrl, { next: { revalidate: 600 } });
-    const data = (await response.json()) as Rss2JsonResponse;
-    const fallbackItems: Rss2JsonItem[] = [
-      { title: "E-ticarette mikro stok yönetimi daha kritik hale geliyor", link: "https://bloomberght.com" },
-      { title: "KOBİ'ler için dijital ödeme komisyonları yakından izleniyor", link: "https://reuters.com" },
-      { title: "Tüketici ilgisi düşük fiyatlı pratik ürünlere kayıyor", link: "https://trendhunter.com" },
-    ];
-    const items = data.items && data.items.length > 0 ? data.items.slice(0, 3) : fallbackItems;
-    const giyimKategorisi = bankaData?.kategoriAnalizi?.kategoriLimitleri?.find((kategori) => kategori.kategori === "E-Ticaret / Giyim");
-    const isLimitAsildi = giyimKategorisi?.durum === "LIMIT_ASILDI";
-    const serbestButce = bankaData?.nakitAkisi?.KalanSerbestBütce || "0 TL";
+  const { data: existing } = await supabase.from("agent_watch_topics").select("id").eq("user_id", userId).eq("topic", normalizedTopic).eq("intent", intent).maybeSingle();
+  if (existing) return;
 
-    return items.map((item, index) => {
-      let personalNote = "AJAN NOTU: Genel piyasa sinyalleri dengeli, ticari bütçeni koruyarak hareket et.";
-
-      if (index === 0) {
-        personalNote = isLimitAsildi
-          ? `AJAN NOTU: Bu canlı gelişme piyasada marjları daraltabilir. ${displayName}, sistemde Giyim limitini ${giyimKategorisi.harcanan} harcamayla aştığın için bu alanda yeni bir e-ticaret stoğuna girmek şu an ALMA kararı içerir.`
-          : `AJAN NOTU: Piyasa hareketli, serbest bütçen (${serbestButce}) ile ufak bir niş ürün testi düşünülebilir.`;
-      } else if (index === 1) {
-        personalNote = `AJAN NOTU: Güncel haber sinyalleri nakit akışının önemini vurguluyor. Kullanılabilir esnek alanını (${bankaData?.hesapOzet?.kullanilabilirEsnekAlan || "Kısıtlı"}) riske atmamak için bireysel borçlanmadan kaçın.`;
-      }
-
-      return {
-        title: item.title || "Canlı piyasa sinyali okunuyor",
-        source: data.feed?.title || "Live Piyasa Agent",
-        url: item.link || "https://www.webrazzi.com",
-        time: "Canlı Sinyal",
-        bundleSummary: personalNote,
-      };
-    });
-  } catch (error) {
-    console.error("HABER AJANI FETCH HATASI:", error);
-    return [
-      { title: "E-ticarette mikro stok yönetimi kritikleşiyor", source: "Yedek Piyasa Agent", url: "https://bloomberght.com", time: "5 dk önce", bundleSummary: "Sistem yedek modda, harcamalarını dengele." },
-    ];
-  }
-}
-
-async function getGoogleAccessToken() {
-  const refreshToken = process.env.GOOGLE_REFRESH_TOKEN?.trim();
-
-  if (!refreshToken) {
-    throw new Error("GOOGLE_REFRESH_TOKEN ortam değişkeni eksik.");
-  }
-
-  const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "refresh_token",
-      client_id: "32555940559.apps.googleusercontent.com",
-      refresh_token: refreshToken,
-    }),
+  await supabase.from("agent_watch_topics").insert({
+    user_id: userId,
+    topic: normalizedTopic,
+    intent,
   });
-
-  const tokenData = (await tokenResponse.json()) as TokenResponse;
-
-  if (!tokenResponse.ok || !tokenData.access_token) {
-    console.error("GOOGLE TOKEN ERROR:", tokenData);
-    throw new Error(tokenData.error_description || tokenData.error || "Google access token üretilemedi.");
-  }
-
-  return tokenData.access_token;
-}
-
-function readDialogflowConfig() {
-  const projectId = process.env.DIALOGFLOW_CX_PROJECT_ID;
-  const location = process.env.DIALOGFLOW_CX_LOCATION || "global";
-  const agentId = process.env.DIALOGFLOW_CX_AGENT_ID;
-
-  if (!projectId || !agentId) {
-    throw new Error("Dialogflow CX ortam değişkenleri eksik: DIALOGFLOW_CX_PROJECT_ID ve DIALOGFLOW_CX_AGENT_ID gerekli.");
-  }
-
-  return { projectId, location, agentId };
-}
-
-function getDialogflowEndpoint(projectId: string, location: string, agentId: string, userId: string) {
-  const sessionId = userId || "anonymous-user";
-  return `https://${location}-dialogflow.googleapis.com/v3/projects/${projectId}/locations/${location}/agents/${agentId}/sessions/${sessionId}:detectIntent`;
-}
-
-async function resolveIdentity(body: AssistantRequest) {
-  const supabase = await createSupabaseServerClient();
-  const { data } = await supabase.auth.getUser();
-  const userId = body.userId || data.user?.id;
-
-  if (!userId) {
-    return { supabase, userId: "anonymous-user", userName: body.userName?.trim() || "Değerli Sarowth Kullanıcısı", isAuthenticated: false };
-  }
-
-  if (body.userName?.trim()) {
-    return { supabase, userId, userName: body.userName.trim(), isAuthenticated: Boolean(data.user?.id) };
-  }
-
-  const { data: profile } = await supabase.from("profiles").select("full_name, email").eq("id", userId).single();
-  const userName = profile?.full_name?.trim() || profile?.email || data.user?.email || "Değerli Sarowth Kullanıcısı";
-
-  return { supabase, userId, userName, isAuthenticated: Boolean(data.user?.id) };
-}
-
-function extractAgentReply(dfData: DialogflowResponse) {
-  return dfData.queryResult?.responseMessages?.[0]?.text?.text?.[0] || "Asistan şu an harcamalarını analiz ediyor...";
 }
 
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as AssistantRequest;
-    const { userId: requestUserId, userName: requestUserName } = body;
-    const userMessage = (body.userMessage ?? body.message)?.trim();
+    const message = (body.userMessage ?? body.message ?? "").trim();
 
-    if (!userMessage) {
-      return NextResponse.json({
-        success: false,
-        reply: "Bana bütçen, satın alma kararın veya ürün fikrinle ilgili bir soru sorabilirsin.",
-        dashboardData: null,
-      }, { status: 400 });
+    if (!message) {
+      return NextResponse.json({ success: true, reply: commandHelp, dashboardData: null });
     }
 
-    const { supabase, userId, userName, isAuthenticated } = await resolveIdentity({ ...body, userId: requestUserId, userName: requestUserName });
-    const resolvedUserName = userName || "Değerli Sarowth Kullanıcısı";
+    const supabase = await createSupabaseServerClient();
+    const { data: userData } = await supabase.auth.getUser();
 
-    const { projectId, location, agentId } = readDialogflowConfig();
-    const accessToken = await getGoogleAccessToken();
-    const bankaVerisi = await bankaAgentYuvasi(userId, resolvedUserName);
-    const trendUrunler = await trendUrunlerYuvasi();
-    const akilliHaberler = await haberTrendYuvasi(bankaVerisi, resolvedUserName);
-    const url = getDialogflowEndpoint(projectId, location, agentId, userId);
-
-    if (isAuthenticated) {
-      await supabase.from("assistant_messages").insert({
-        user_id: userId,
-        role: "user",
-        content: userMessage,
-      });
+    if (!userData.user) {
+      return NextResponse.json({ success: false, reply: "Bu asistanı kullanmak için önce giriş yapmalısın.", dashboardData: null }, { status: 401 });
     }
 
-    const dfResponse = await fetch(url, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        queryInput: {
-          text: { text: userMessage },
-          languageCode: "tr",
-        },
-        queryParams: {
-          payload: {
-            user_name: resolvedUserName,
-            user_id: userId,
-            banka: bankaVerisi,
-            trendUrunler,
-            finansHaberleri: akilliHaberler,
-          },
-        },
-      }),
-    });
+    const [{ data: budgetEntries }, { data: marketSignals }, { data: financeNews }, { data: supplierLinks }] = await Promise.all([
+      supabase.from("budget_entries").select("label, category, amount, entry_type, occurred_on").eq("user_id", userData.user.id).limit(120),
+      supabase.from("market_product_signals").select("product_name, signal, score, source_url").order("score", { ascending: false }).limit(12),
+      supabase.from("finance_news_items").select("title, source, url, summary").order("published_at", { ascending: false }).order("created_at", { ascending: false }).limit(12),
+      supabase.from("product_supplier_links").select("product_name, title, url, source, price_text, score").order("score", { ascending: false }).limit(24),
+    ]);
 
-    const dfData = (await dfResponse.json()) as DialogflowResponse;
+    const entries = (budgetEntries ?? []) as BudgetEntry[];
+    const signals = (marketSignals ?? []) as MarketSignal[];
+    const news = (financeNews ?? []) as NewsItem[];
+    const suppliers = (supplierLinks ?? []) as SupplierLink[];
+    const summary = buildBudgetSummary(entries);
+    const { command, text } = parseCommand(message);
+    const amount = parseAmount(text);
 
-    if (!dfResponse.ok) {
-      console.error("DIALOGFLOW DETECT INTENT ERROR:", dfData);
-      throw new Error(dfData.error?.message || `Dialogflow detectIntent başarısız: ${dfResponse.status}`);
+    let reply = commandHelp;
+
+    if (command === "al") {
+      reply = amount ? getPurchaseDecision(amount, summary) : "Satın alma kararı için tutar yazmalısın. Örnek: /al Nike ayakkabı 2400 TL";
+    } else if (command === "haber") {
+      if (text) await rememberWatchTopic(supabase, userData.user.id, text, "news_watch");
+      reply = buildNewsReply(text, news);
+    } else if (command === "takip") {
+      if (text) await rememberWatchTopic(supabase, userData.user.id, text, "product_watch");
+      reply = text ? buildTrackingReply(text, signals, suppliers) : "Takip etmek istediğin ürünü yaz. Örnek: /takip stres çarkı";
+    } else if (command === "yatirim") {
+      await rememberWatchTopic(supabase, userData.user.id, "yatırım fırsatları", "investment_watch");
+      reply = buildInvestmentReply(summary);
+    } else if (command === "ozet") {
+      reply = `Bütçe Özeti\n\nGelir: ₺${summary.income.toLocaleString("tr-TR")}\nGider: ₺${summary.expenses.toLocaleString("tr-TR")}\nTasarruf: ₺${summary.savings.toLocaleString("tr-TR")}\nSerbest alan: ₺${summary.available.toLocaleString("tr-TR")}\nEn yüksek kategori: ${summary.topCategory?.[0] ?? "Yok"}`;
     }
 
-    const agentResponseText = extractAgentReply(dfData);
-
-    if (isAuthenticated) {
-      await supabase.from("assistant_messages").insert({
-        user_id: userId,
-        role: "assistant",
-        content: agentResponseText,
-      });
-    }
+    await supabase.from("assistant_messages").insert([
+      { user_id: userData.user.id, role: "user", content: message },
+      { user_id: userData.user.id, role: "assistant", content: reply },
+    ]);
 
     return NextResponse.json({
       success: true,
-      reply: agentResponseText,
-      dashboardData: {
-        banka: bankaVerisi,
-        trendUrunler,
-        finansHaberleri: akilliHaberler,
-      },
+      reply,
+      dashboardData: buildDashboardData(summary, signals, news),
     });
   } catch (error) {
-    console.error("CRITICAL RUNTIME ERROR:", error);
-
-    const message = error instanceof Error ? error.message : "Asistan çalıştırılırken bilinmeyen bir hata oluştu.";
-
+    console.error("ASSISTANT_COMMAND_ENGINE_ERROR:", error);
     return NextResponse.json({
       success: false,
-      reply: "Asistan şu anda yanıt veremiyor. Dialogflow CX bağlantı, refresh token ve ortam değişkenlerini kontrol et.",
-      dashboardData: {
-        banka: null,
-        trendUrunler: await trendUrunlerYuvasi(),
-        finansHaberleri: await haberTrendYuvasi(await bankaAgentYuvasi("fallback", "Değerli Sarowth Kullanıcısı"), "Değerli Sarowth Kullanıcısı"),
-      },
-      error: message,
+      reply: "Asistan şu anda yanıt veremiyor. Biraz sonra tekrar dene.",
+      dashboardData: null,
     }, { status: 500 });
   }
 }

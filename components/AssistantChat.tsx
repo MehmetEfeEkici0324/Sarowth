@@ -16,7 +16,7 @@ export function AssistantChat({ onDashboardData }: AssistantChatProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      content: "Merhaba, ben Sarowth asistanın. Banka hareketlerin, harcama kategorilerin, tasarruf hedefin ve ürün fikirlerin üzerinden kişisel karar desteği sunarım. Bir şey almak istiyorsan bana sorabilirsin.",
+      content: "Merhaba, ben Sarowth karar asistanın. Şimdilik komutla çalışıyorum:\n/al Ürün adı 1200 TL\n/haber konu\n/takip ürün adı\n/yatirim\n/ozet",
     },
   ]);
   const [input, setInput] = useState("");
