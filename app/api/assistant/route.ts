@@ -3,6 +3,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 interface AssistantRequest {
   message?: string;
+  userMessage?: string;
   userId?: string;
   userName?: string;
 }
@@ -16,6 +17,9 @@ interface BankaVerisi {
     KalanSerbestBütce: string;
   };
   hesapOzet: {
+    hesapSahibi: string;
+    bankaAdi: string;
+    bakiye: string;
     kullanilabilirEsnekAlan: string;
   };
   kategoriAnalizi: {
@@ -76,8 +80,9 @@ interface DialogflowResponse {
   };
 }
 
-async function bankaAgentYuvasi(userId: string): Promise<BankaVerisi> {
+async function bankaAgentYuvasi(userId: string, userName: string): Promise<BankaVerisi> {
   void userId;
+  const hesapSahibi = userName || "Kullanıcı";
 
   return {
     bakiye: "4,250 TL",
@@ -88,6 +93,9 @@ async function bankaAgentYuvasi(userId: string): Promise<BankaVerisi> {
       KalanSerbestBütce: "1,450 TL",
     },
     hesapOzet: {
+      hesapSahibi,
+      bankaAdi: "Sarowth Merkez Bankası SIM",
+      bakiye: "4,250.00 TL",
       kullanilabilirEsnekAlan: "Kısıtlı",
     },
     kategoriAnalizi: {
@@ -107,8 +115,9 @@ async function trendUrunlerYuvasi(): Promise<TrendUrunu[]> {
   ];
 }
 
-async function haberTrendYuvasi(bankaData: BankaVerisi): Promise<FinansHaberi[]> {
+async function haberTrendYuvasi(bankaData: BankaVerisi, userName: string): Promise<FinansHaberi[]> {
   try {
+    const displayName = userName || bankaData?.hesapOzet?.hesapSahibi || "Değerli Sarowth Kullanıcısı";
     const rssTargetUrl = encodeURIComponent("https://www.webrazzi.com/feed");
     const agentApiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${rssTargetUrl}`;
     const response = await fetch(agentApiUrl, { next: { revalidate: 600 } });
@@ -128,7 +137,7 @@ async function haberTrendYuvasi(bankaData: BankaVerisi): Promise<FinansHaberi[]>
 
       if (index === 0) {
         personalNote = isLimitAsildi
-          ? `AJAN NOTU: Bu canlı gelişme piyasada marjları daraltabilir. Mehmet Efe, sistemde Giyim limitini ${giyimKategorisi.harcanan} harcamayla aştığın için bu alanda yeni bir e-ticaret stoğuna girmek şu an ALMA kararı içerir.`
+          ? `AJAN NOTU: Bu canlı gelişme piyasada marjları daraltabilir. ${displayName}, sistemde Giyim limitini ${giyimKategorisi.harcanan} harcamayla aştığın için bu alanda yeni bir e-ticaret stoğuna girmek şu an ALMA kararı içerir.`
           : `AJAN NOTU: Piyasa hareketli, serbest bütçen (${serbestButce}) ile ufak bir niş ürün testi düşünülebilir.`;
       } else if (index === 1) {
         personalNote = `AJAN NOTU: Güncel haber sinyalleri nakit akışının önemini vurguluyor. Kullanılabilir esnek alanını (${bankaData?.hesapOzet?.kullanilabilirEsnekAlan || "Kısıtlı"}) riske atmamak için bireysel borçlanmadan kaçın.`;
@@ -190,7 +199,7 @@ function readDialogflowConfig() {
 }
 
 function getDialogflowEndpoint(projectId: string, location: string, agentId: string, userId: string) {
-  const sessionId = `sarowth-session-${userId.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+  const sessionId = userId || "anonymous-user";
   return `https://${location}-dialogflow.googleapis.com/v3/projects/${projectId}/locations/${location}/agents/${agentId}/sessions/${sessionId}:detectIntent`;
 }
 
@@ -200,17 +209,17 @@ async function resolveIdentity(body: AssistantRequest) {
   const userId = body.userId || data.user?.id;
 
   if (!userId) {
-    return { supabase, userId: null, userName: null };
+    return { supabase, userId: "anonymous-user", userName: body.userName?.trim() || "Değerli Sarowth Kullanıcısı", isAuthenticated: false };
   }
 
   if (body.userName?.trim()) {
-    return { supabase, userId, userName: body.userName.trim() };
+    return { supabase, userId, userName: body.userName.trim(), isAuthenticated: Boolean(data.user?.id) };
   }
 
   const { data: profile } = await supabase.from("profiles").select("full_name, email").eq("id", userId).single();
-  const userName = profile?.full_name?.trim() || profile?.email || data.user?.email || "Mehmet Efe";
+  const userName = profile?.full_name?.trim() || profile?.email || data.user?.email || "Değerli Sarowth Kullanıcısı";
 
-  return { supabase, userId, userName };
+  return { supabase, userId, userName, isAuthenticated: Boolean(data.user?.id) };
 }
 
 function extractAgentReply(dfData: DialogflowResponse) {
@@ -220,7 +229,8 @@ function extractAgentReply(dfData: DialogflowResponse) {
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as AssistantRequest;
-    const userMessage = body.message?.trim();
+    const { userId: requestUserId, userName: requestUserName } = body;
+    const userMessage = (body.userMessage ?? body.message)?.trim();
 
     if (!userMessage) {
       return NextResponse.json({
@@ -230,28 +240,23 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
-    const { supabase, userId, userName } = await resolveIdentity(body);
-
-    if (!userId || !userName) {
-      return NextResponse.json({
-        success: false,
-        reply: "Bu asistanı kullanmak için önce giriş yapmalısın.",
-        dashboardData: null,
-      }, { status: 401 });
-    }
+    const { supabase, userId, userName, isAuthenticated } = await resolveIdentity({ ...body, userId: requestUserId, userName: requestUserName });
+    const resolvedUserName = userName || "Değerli Sarowth Kullanıcısı";
 
     const { projectId, location, agentId } = readDialogflowConfig();
     const accessToken = await getGoogleAccessToken();
-    const bankaVerisi = await bankaAgentYuvasi(userId);
+    const bankaVerisi = await bankaAgentYuvasi(userId, resolvedUserName);
     const trendUrunler = await trendUrunlerYuvasi();
-    const akilliHaberler = await haberTrendYuvasi(bankaVerisi);
+    const akilliHaberler = await haberTrendYuvasi(bankaVerisi, resolvedUserName);
     const url = getDialogflowEndpoint(projectId, location, agentId, userId);
 
-    await supabase.from("assistant_messages").insert({
-      user_id: userId,
-      role: "user",
-      content: userMessage,
-    });
+    if (isAuthenticated) {
+      await supabase.from("assistant_messages").insert({
+        user_id: userId,
+        role: "user",
+        content: userMessage,
+      });
+    }
 
     const dfResponse = await fetch(url, {
       method: "POST",
@@ -266,7 +271,7 @@ export async function POST(request: Request) {
         },
         queryParams: {
           payload: {
-            user_name: userName,
+            user_name: resolvedUserName,
             user_id: userId,
             banka: bankaVerisi,
             trendUrunler,
@@ -285,11 +290,13 @@ export async function POST(request: Request) {
 
     const agentResponseText = extractAgentReply(dfData);
 
-    await supabase.from("assistant_messages").insert({
-      user_id: userId,
-      role: "assistant",
-      content: agentResponseText,
-    });
+    if (isAuthenticated) {
+      await supabase.from("assistant_messages").insert({
+        user_id: userId,
+        role: "assistant",
+        content: agentResponseText,
+      });
+    }
 
     return NextResponse.json({
       success: true,
@@ -311,7 +318,7 @@ export async function POST(request: Request) {
       dashboardData: {
         banka: null,
         trendUrunler: await trendUrunlerYuvasi(),
-        finansHaberleri: await haberTrendYuvasi(await bankaAgentYuvasi("fallback")),
+        finansHaberleri: await haberTrendYuvasi(await bankaAgentYuvasi("fallback", "Değerli Sarowth Kullanıcısı"), "Değerli Sarowth Kullanıcısı"),
       },
       error: message,
     }, { status: 500 });
