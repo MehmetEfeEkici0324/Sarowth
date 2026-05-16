@@ -27,11 +27,17 @@ interface BankaAgentVerisi {
   sonGuncelleme: string;
 }
 
-interface HaberTrendVerisi {
-  baslik: string;
-  gorsel: string;
-  aciklama: string;
-  kaynakUrl: string;
+interface TrendUrunVerisi {
+  title: string;
+  description: string;
+  score: string;
+  source: string;
+}
+
+interface FinansHaberiVerisi {
+  title: string;
+  source: string;
+  url: string;
 }
 
 interface DialogflowConfig {
@@ -74,10 +80,6 @@ function objectToStruct(value: { [key: string]: JsonValue }): protos.google.prot
   };
 }
 
-function getFirstUrl(text: string) {
-  return text.match(/https?:\/\/[^\s]+/i)?.[0] ?? null;
-}
-
 async function bankaAgentYuvasi(userId: string): Promise<BankaAgentVerisi> {
   const userSeed = userId.split("").reduce((sum, char) => sum + char.charCodeAt(0), 0);
   const aylikGelir = 42000 + (userSeed % 8) * 1250;
@@ -103,13 +105,20 @@ async function bankaAgentYuvasi(userId: string): Promise<BankaAgentVerisi> {
   };
 }
 
-async function haberTrendYuvasi(url: string): Promise<HaberTrendVerisi> {
-  return {
-    baslik: "Trend analizi hazırlanıyor",
-    gorsel: "https://sarowth.com/og-image.svg",
-    aciklama: "Bu bağlantı için haber, fiyat ve ticari sinyal özeti open-graph-scraper entegrasyonu sonrası otomatik üretilecek.",
-    kaynakUrl: url,
-  };
+async function trendUrunlerYuvasi(): Promise<TrendUrunVerisi[]> {
+  return [
+    { title: "Katlanabilir seyahat çantası", description: "Kısa video içeriklerinde tekrar eden talep", score: "87/100", source: "Trend Agent" },
+    { title: "Mini masa süpürgesi", description: "Ev/ofis düzeni içeriklerinde yükseliyor", score: "81/100", source: "Piyasa Agent" },
+    { title: "Soğuk kahve başlangıç seti", description: "Sezon öncesi arama hacmi güçleniyor", score: "76/100", source: "Ürün Agent" },
+  ];
+}
+
+async function haberTrendYuvasi(): Promise<FinansHaberiVerisi[]> {
+  return [
+    { title: "E-ticarette mikro stok yönetimi daha kritik hale geliyor", source: "Finans Haber Agent", url: "https://bloomberght.com" },
+    { title: "KOBİ'ler için dijital ödeme maliyetleri yakından izleniyor", source: "Piyasa Haber Agent", url: "https://reuters.com" },
+    { title: "Tüketici ilgisi düşük fiyatlı pratik ürünlere kayıyor", source: "Trend Haber Agent", url: "https://trendhunter.com" },
+  ];
 }
 
 async function resolveRequestIdentity(body: AssistantRequest) {
@@ -133,13 +142,15 @@ async function resolveRequestIdentity(body: AssistantRequest) {
 }
 
 function buildDialogflowClient() {
-  if (process.env.GOOGLE_REFRESH_TOKEN) {
+  const credentials = process.env.GOOGLE_REFRESH_TOKEN ? {
+    type: "authorized_user" as const,
+    client_id: "32555940559.apps.googleusercontent.com",
+    refresh_token: process.env.GOOGLE_REFRESH_TOKEN.trim(),
+  } : undefined;
+
+  if (credentials) {
     return new SessionsClient({
-      credentials: {
-        type: "authorized_user",
-        client_id: "32555940559.apps.googleusercontent.com",
-        refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
-      },
+      credentials,
     });
   }
 
@@ -171,8 +182,8 @@ export async function POST(request: Request) {
 
     const dialogflowConfig = readDialogflowConfig();
     const bankaVerisi = await bankaAgentYuvasi(userId);
-    const detectedUrl = getFirstUrl(message);
-    const haberTrendVerisi = detectedUrl ? await haberTrendYuvasi(detectedUrl) : null;
+    const trendUrunler = await trendUrunlerYuvasi();
+    const finansHaberleri = await haberTrendYuvasi();
     const client = buildDialogflowClient();
     const sessionPath = client.projectLocationAgentSessionPath(
       dialogflowConfig.projectId,
@@ -190,6 +201,7 @@ export async function POST(request: Request) {
     const parameters = objectToStruct({
       userId,
       userName,
+      user_name: userName,
       bankaAdi: bankaVerisi.bankaAdi,
       hesapTuru: bankaVerisi.hesapTuru,
       bakiye: bankaVerisi.bakiye,
@@ -198,7 +210,8 @@ export async function POST(request: Request) {
       kullanilabilirAlan: bankaVerisi.kullanilabilirAlan,
       riskSeviyesi: bankaVerisi.riskSeviyesi,
       harcamaKategorileri: bankaVerisi.harcamaKategorileri as unknown as JsonValue,
-      haberTrend: haberTrendVerisi as unknown as JsonValue,
+      trendUrunler: trendUrunler as unknown as JsonValue,
+      finansHaberleri: finansHaberleri as unknown as JsonValue,
     });
 
     const [dialogflowResponse] = await client.detectIntent({
@@ -226,9 +239,14 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       reply,
-      dashboardData: bankaVerisi,
+      dashboardData: {
+        banka: bankaVerisi,
+        trendUrunler,
+        finansHaberleri,
+      },
     });
   } catch (error) {
+    console.error("CRITICAL RUNTIME ERROR:", error);
     const message = error instanceof Error ? error.message : "Asistan çalıştırılırken bilinmeyen bir hata oluştu.";
 
     return NextResponse.json({
