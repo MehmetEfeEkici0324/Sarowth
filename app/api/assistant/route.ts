@@ -12,6 +12,21 @@ interface BankaVerisi {
   aylikHarcama: string;
   enCokHarcatilanKategori: string;
   sonHarekeler: string[];
+  nakitAkisi: {
+    KalanSerbestBütce: string;
+  };
+  hesapOzet: {
+    kullanilabilirEsnekAlan: string;
+  };
+  kategoriAnalizi: {
+    kategoriLimitleri: Array<{
+      kategori: string;
+      limit: string;
+      mevcut: string;
+      harcanan: string;
+      durum: "LIMIT_ASILDI" | "NORMAL";
+    }>;
+  };
 }
 
 interface TrendUrunu {
@@ -25,6 +40,20 @@ interface FinansHaberi {
   title: string;
   source: string;
   url: string;
+  time: string;
+  bundleSummary: string;
+}
+
+interface Rss2JsonItem {
+  title?: string;
+  link?: string;
+}
+
+interface Rss2JsonResponse {
+  feed?: {
+    title?: string;
+  };
+  items?: Rss2JsonItem[];
 }
 
 interface TokenResponse {
@@ -55,6 +84,18 @@ async function bankaAgentYuvasi(userId: string): Promise<BankaVerisi> {
     aylikHarcama: "12,800 TL",
     enCokHarcatilanKategori: "E-Ticaret / Giyim",
     sonHarekeler: ["Amazon.com.tr - 1,200 TL", "Hepsiburada - 450 TL"],
+    nakitAkisi: {
+      KalanSerbestBütce: "1,450 TL",
+    },
+    hesapOzet: {
+      kullanilabilirEsnekAlan: "Kısıtlı",
+    },
+    kategoriAnalizi: {
+      kategoriLimitleri: [
+        { kategori: "E-Ticaret / Giyim", limit: "2,500 TL", mevcut: "3,150 TL", harcanan: "3,150 TL", durum: "LIMIT_ASILDI" },
+        { kategori: "Mutfak", limit: "7,500 TL", mevcut: "6,900 TL", harcanan: "6,900 TL", durum: "NORMAL" },
+      ],
+    },
   };
 }
 
@@ -66,12 +107,47 @@ async function trendUrunlerYuvasi(): Promise<TrendUrunu[]> {
   ];
 }
 
-async function haberTrendYuvasi(): Promise<FinansHaberi[]> {
-  return [
-    { title: "E-ticarette mikro stok yönetimi daha kritik hale geliyor", source: "Finans Haber Agent", url: "https://bloomberght.com" },
-    { title: "KOBİ'ler için dijital ödeme maliyetleri yakından izleniyor", source: "Piyasa Haber Agent", url: "https://reuters.com" },
-    { title: "Tüketici ilgisi düşük fiyatlı pratik ürünlere kayıyor", source: "Trend Haber Agent", url: "https://trendhunter.com" },
-  ];
+async function haberTrendYuvasi(bankaData: BankaVerisi): Promise<FinansHaberi[]> {
+  try {
+    const rssTargetUrl = encodeURIComponent("https://www.webrazzi.com/feed");
+    const agentApiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${rssTargetUrl}`;
+    const response = await fetch(agentApiUrl, { next: { revalidate: 600 } });
+    const data = (await response.json()) as Rss2JsonResponse;
+    const fallbackItems: Rss2JsonItem[] = [
+      { title: "E-ticarette mikro stok yönetimi daha kritik hale geliyor", link: "https://bloomberght.com" },
+      { title: "KOBİ'ler için dijital ödeme komisyonları yakından izleniyor", link: "https://reuters.com" },
+      { title: "Tüketici ilgisi düşük fiyatlı pratik ürünlere kayıyor", link: "https://trendhunter.com" },
+    ];
+    const items = data.items && data.items.length > 0 ? data.items.slice(0, 3) : fallbackItems;
+    const giyimKategorisi = bankaData?.kategoriAnalizi?.kategoriLimitleri?.find((kategori) => kategori.kategori === "E-Ticaret / Giyim");
+    const isLimitAsildi = giyimKategorisi?.durum === "LIMIT_ASILDI";
+    const serbestButce = bankaData?.nakitAkisi?.KalanSerbestBütce || "0 TL";
+
+    return items.map((item, index) => {
+      let personalNote = "AJAN NOTU: Genel piyasa sinyalleri dengeli, ticari bütçeni koruyarak hareket et.";
+
+      if (index === 0) {
+        personalNote = isLimitAsildi
+          ? `AJAN NOTU: Bu canlı gelişme piyasada marjları daraltabilir. Mehmet Efe, sistemde Giyim limitini ${giyimKategorisi.harcanan} harcamayla aştığın için bu alanda yeni bir e-ticaret stoğuna girmek şu an ALMA kararı içerir.`
+          : `AJAN NOTU: Piyasa hareketli, serbest bütçen (${serbestButce}) ile ufak bir niş ürün testi düşünülebilir.`;
+      } else if (index === 1) {
+        personalNote = `AJAN NOTU: Güncel haber sinyalleri nakit akışının önemini vurguluyor. Kullanılabilir esnek alanını (${bankaData?.hesapOzet?.kullanilabilirEsnekAlan || "Kısıtlı"}) riske atmamak için bireysel borçlanmadan kaçın.`;
+      }
+
+      return {
+        title: item.title || "Canlı piyasa sinyali okunuyor",
+        source: data.feed?.title || "Live Piyasa Agent",
+        url: item.link || "https://www.webrazzi.com",
+        time: "Canlı Sinyal",
+        bundleSummary: personalNote,
+      };
+    });
+  } catch (error) {
+    console.error("HABER AJANI FETCH HATASI:", error);
+    return [
+      { title: "E-ticarette mikro stok yönetimi kritikleşiyor", source: "Yedek Piyasa Agent", url: "https://bloomberght.com", time: "5 dk önce", bundleSummary: "Sistem yedek modda, harcamalarını dengele." },
+    ];
+  }
 }
 
 async function getGoogleAccessToken() {
@@ -167,6 +243,8 @@ export async function POST(request: Request) {
     const { projectId, location, agentId } = readDialogflowConfig();
     const accessToken = await getGoogleAccessToken();
     const bankaVerisi = await bankaAgentYuvasi(userId);
+    const trendUrunler = await trendUrunlerYuvasi();
+    const akilliHaberler = await haberTrendYuvasi(bankaVerisi);
     const url = getDialogflowEndpoint(projectId, location, agentId, userId);
 
     await supabase.from("assistant_messages").insert({
@@ -191,6 +269,8 @@ export async function POST(request: Request) {
             user_name: userName,
             user_id: userId,
             banka: bankaVerisi,
+            trendUrunler,
+            finansHaberleri: akilliHaberler,
           },
         },
       }),
@@ -216,8 +296,8 @@ export async function POST(request: Request) {
       reply: agentResponseText,
       dashboardData: {
         banka: bankaVerisi,
-        trendUrunler: await trendUrunlerYuvasi(),
-        finansHaberleri: await haberTrendYuvasi(),
+        trendUrunler,
+        finansHaberleri: akilliHaberler,
       },
     });
   } catch (error) {
@@ -231,7 +311,7 @@ export async function POST(request: Request) {
       dashboardData: {
         banka: null,
         trendUrunler: await trendUrunlerYuvasi(),
-        finansHaberleri: await haberTrendYuvasi(),
+        finansHaberleri: await haberTrendYuvasi(await bankaAgentYuvasi("fallback")),
       },
       error: message,
     }, { status: 500 });

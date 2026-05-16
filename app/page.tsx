@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { ArrowUpRight, BadgeDollarSign, Landmark, Mail, Newspaper, PlugZap, Radar, ShoppingBag, TrendingUp } from "lucide-react";
+import { AgentIntelligenceWorkspace } from "@/components/AgentIntelligenceWorkspace";
 import { AgentCards } from "@/components/AgentCards";
-import { AssistantChat } from "@/components/AssistantChat";
 import { Footer } from "@/components/Footer";
 import { Hero } from "@/components/Hero";
 import { Navbar } from "@/components/Navbar";
@@ -16,7 +16,7 @@ interface AuthenticatedHomeProps {
   budgetEntries: Array<{ amount: number | string; entry_type: string; category: string }>;
   ideas: Array<{ product_name: string; demand_score: number; estimated_margin: number | string; status: string }>;
   marketSignals: Array<{ name: string; signal: string; score: number; source: string }>;
-  financeNews: Array<{ title: string; source: string; href: string }>;
+  financeNews: Array<{ title: string; source: string; href: string; time?: string; bundleSummary?: string }>;
 }
 
 const defaultMarketSignals = [
@@ -26,9 +26,9 @@ const defaultMarketSignals = [
 ];
 
 const defaultFinanceNews = [
-  { title: "E-ticarette mikro stok yönetimi daha kritik hale geliyor", source: "Finans Haber Agent", href: "https://www.google.com/search?q=e-ticaret+stok+y%C3%B6netimi+haber" },
-  { title: "KOBİ'ler için dijital ödeme maliyetleri yakından izleniyor", source: "Piyasa Haber Agent", href: "https://www.google.com/search?q=KOB%C4%B0+dijital+%C3%B6deme+maliyetleri" },
-  { title: "Tüketici ilgisi düşük fiyatlı pratik ürünlere kayıyor", source: "Trend Haber Agent", href: "https://www.google.com/search?q=t%C3%BCketici+trendleri+pratik+%C3%BCr%C3%BCnler" },
+  { title: "E-ticarette mikro stok yönetimi daha kritik hale geliyor", source: "Finans Haber Agent", href: "https://bloomberght.com", time: "10 dk önce", bundleSummary: "AJAN NOTU: Genel piyasa sinyali olumlu, az stoklu e-ticaret modelleri denenebilir." },
+  { title: "KOBİ'ler için dijital ödeme maliyetleri yakından izleniyor", source: "Piyasa Haber Agent", href: "https://reuters.com", time: "1 saat önce", bundleSummary: "AJAN NOTU: Sanal pos komisyonları %3.5 bandına dayandı. Ticari ödemelerde nakit akışını korumak kritik." },
+  { title: "Tüketici ilgisi düşük fiyatlı pratik ürünlere kayıyor", source: "Trend Haber Agent", href: "https://trendhunter.com", time: "2 saat önce", bundleSummary: "AJAN NOTU: Düşük fiyatlı pratik ürünlerde test bütçesiyle ilerlemek daha güvenli." },
 ];
 
 const investmentIdeas = [
@@ -73,7 +73,7 @@ export default async function HomePage({}: HomePageProps) {
         supabase.from("budget_entries").select("amount, entry_type, category").eq("user_id", data.user.id),
         supabase.from("ecommerce_ideas").select("product_name, demand_score, estimated_margin, status").eq("user_id", data.user.id).order("created_at", { ascending: false }).limit(4),
         supabase.from("market_product_signals").select("product_name, signal, score, source_url").order("score", { ascending: false }).order("created_at", { ascending: false }).limit(6),
-        supabase.from("finance_news_items").select("title, source, url").order("published_at", { ascending: false }).order("created_at", { ascending: false }).limit(6),
+        supabase.from("finance_news_items").select("title, source, url, summary").order("published_at", { ascending: false }).order("created_at", { ascending: false }).limit(6),
       ]);
       const marketSignals = (signalRows ?? []).map((row) => {
         let source = "Piyasa Agent";
@@ -95,6 +95,8 @@ export default async function HomePage({}: HomePageProps) {
         title: row.title,
         source: row.source,
         href: row.url,
+        time: "Canlı haber",
+        bundleSummary: row.summary ? `AJAN NOTU: ${row.summary}` : "AJAN NOTU: Bu haber piyasa sinyalleri için izleniyor; kişisel risk analizi chat sonrası netleşir.",
       }));
       const resolvedUserName = profile?.full_name?.split(" ")[0] ?? profile?.email ?? data.user.email ?? "Profil";
       userName = resolvedUserName;
@@ -182,10 +184,7 @@ function AuthenticatedHome({ userName, profile, budgetEntries, ideas, marketSign
             </div>
           </section>
 
-          <div className="mt-6 grid gap-6 lg:grid-cols-2">
-            <AgentMarketSection marketSignals={marketSignals} />
-            <AgentNewsSection financeNews={financeNews} />
-          </div>
+          <AgentIntelligenceWorkspace initialMarketSignals={marketSignals} initialFinanceNews={financeNews} />
 
           <section id="spending" className="mt-6 rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl sm:p-8">
             <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
@@ -219,9 +218,6 @@ function AuthenticatedHome({ userName, profile, budgetEntries, ideas, marketSign
             <CommerceReturnsSection ideas={ideas} />
           </div>
 
-          <div id="assistant" className="mt-6">
-            <AssistantChat />
-          </div>
         </div>
       </section>
     </main>

@@ -8,7 +8,11 @@ interface Message {
   content: string;
 }
 
-export function AssistantChat() {
+interface AssistantChatProps {
+  onDashboardData?: (dashboardData: unknown) => void;
+}
+
+export function AssistantChat({ onDashboardData }: AssistantChatProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
@@ -33,6 +37,9 @@ export function AssistantChat() {
           body: JSON.stringify({ message: content }),
         });
         const data = await response.json();
+        if (data.dashboardData) {
+          onDashboardData?.(data.dashboardData);
+        }
         setMessages((current) => [...current, { role: "assistant", content: data.reply ?? "Şu anda yanıt üretilemedi." }]);
       } catch {
         setMessages((current) => [...current, { role: "assistant", content: "Bağlantı kurulamadı. Biraz sonra tekrar deneyebilirsin." }]);
