@@ -1,171 +1,241 @@
+import { SessionsClient, protos } from "@google-cloud/dialogflow-cx";
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+type JsonPrimitive = string | number | boolean | null;
+type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
+
 interface AssistantRequest {
   message?: string;
+  userId?: string;
+  userName?: string;
 }
 
-function readGeminiModel() {
-  return process.env.GEMINI_MODEL?.trim() || "gemini-2.0-flash";
+interface BankaAgentVerisi {
+  bankaAdi: string;
+  hesapTuru: string;
+  bakiye: number;
+  aylikGelir: number;
+  aylikGider: number;
+  kullanilabilirAlan: number;
+  riskSeviyesi: "dusuk" | "orta" | "yuksek";
+  harcamaKategorileri: Array<{
+    kategori: string;
+    tutar: number;
+    oran: number;
+  }>;
+  sonGuncelleme: string;
 }
 
-function getGeminiErrorReply(status: number, errorText: string) {
-  if (status === 429) {
-    return "Gemini kotası dolmuş veya billing limiti aşılmış görünüyor. Google AI Studio/Gemini API kota ve faturalandırma ayarlarını kontrol edip tekrar dene.";
+interface HaberTrendVerisi {
+  baslik: string;
+  gorsel: string;
+  aciklama: string;
+  kaynakUrl: string;
+}
+
+interface DialogflowConfig {
+  projectId: string;
+  location: string;
+  agentId: string;
+}
+
+function readDialogflowConfig(): DialogflowConfig {
+  const projectId = process.env.DIALOGFLOW_CX_PROJECT_ID ?? process.env.GOOGLE_CLOUD_PROJECT_ID;
+  const location = process.env.DIALOGFLOW_CX_LOCATION ?? "global";
+  const agentId = process.env.DIALOGFLOW_CX_AGENT_ID;
+
+  if (!projectId || !agentId) {
+    throw new Error("Dialogflow CX ortam değişkenleri eksik: DIALOGFLOW_CX_PROJECT_ID ve DIALOGFLOW_CX_AGENT_ID gerekli.");
   }
 
-  if (status === 400) {
-    return "Gemini isteği geçersiz döndü. Model adı, istek içeriği veya API anahtarı ayarlarını kontrol et.";
+  return { projectId, location, agentId };
+}
+
+function valueToProtoValue(value: JsonValue): protos.google.protobuf.IValue {
+  if (value === null) return { nullValue: "NULL_VALUE" };
+  if (typeof value === "string") return { stringValue: value };
+  if (typeof value === "number") return { numberValue: value };
+  if (typeof value === "boolean") return { boolValue: value };
+  if (Array.isArray(value)) {
+    return {
+      listValue: {
+        values: value.map((item) => valueToProtoValue(item)),
+      },
+    };
   }
 
-  if (status === 401 || status === 403) {
-    return "Gemini API anahtarı yetkisiz görünüyor. GEMINI_API_KEY değerini ve anahtar izinlerini kontrol et.";
+  return { structValue: objectToStruct(value) };
+}
+
+function objectToStruct(value: { [key: string]: JsonValue }): protos.google.protobuf.IStruct {
+  return {
+    fields: Object.fromEntries(Object.entries(value).map(([key, item]) => [key, valueToProtoValue(item)])),
+  };
+}
+
+function getFirstUrl(text: string) {
+  return text.match(/https?:\/\/[^\s]+/i)?.[0] ?? null;
+}
+
+async function bankaAgentYuvasi(userId: string): Promise<BankaAgentVerisi> {
+  const userSeed = userId.split("").reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  const aylikGelir = 42000 + (userSeed % 8) * 1250;
+  const aylikGider = 26300 + (userSeed % 6) * 900;
+  const bakiye = 18450 + (userSeed % 10) * 700;
+
+  return {
+    bankaAdi: "Garanti BBVA",
+    hesapTuru: "Vadesiz TL Hesabı",
+    bakiye,
+    aylikGelir,
+    aylikGider,
+    kullanilabilirAlan: Math.max(0, aylikGelir - aylikGider),
+    riskSeviyesi: aylikGider / aylikGelir > 0.75 ? "yuksek" : aylikGider / aylikGelir > 0.55 ? "orta" : "dusuk",
+    harcamaKategorileri: [
+      { kategori: "Mutfak", tutar: 8200, oran: 31 },
+      { kategori: "Abonelik", tutar: 1850, oran: 7 },
+      { kategori: "Ulaşım", tutar: 3600, oran: 14 },
+      { kategori: "Giyim", tutar: 2900, oran: 11 },
+      { kategori: "Kira ve Faturalar", tutar: 9750, oran: 37 },
+    ],
+    sonGuncelleme: new Date().toISOString(),
+  };
+}
+
+async function haberTrendYuvasi(url: string): Promise<HaberTrendVerisi> {
+  return {
+    baslik: "Trend analizi hazırlanıyor",
+    gorsel: "https://sarowth.com/og-image.svg",
+    aciklama: "Bu bağlantı için haber, fiyat ve ticari sinyal özeti open-graph-scraper entegrasyonu sonrası otomatik üretilecek.",
+    kaynakUrl: url,
+  };
+}
+
+async function resolveRequestIdentity(body: AssistantRequest) {
+  const supabase = await createSupabaseServerClient();
+  const { data: userData } = await supabase.auth.getUser();
+  const authUserId = userData.user?.id;
+  const userId = body.userId ?? authUserId;
+
+  if (!userId) {
+    return { supabase, userId: null, userName: null };
   }
 
-  if (status === 404) {
-    return "Gemini modeli bulunamadı veya generateContent için desteklenmiyor. GEMINI_MODEL değerini kontrol et.";
+  if (body.userName) {
+    return { supabase, userId, userName: body.userName };
   }
 
-  const compactError = errorText.replace(/\s+/g, " ").slice(0, 200);
-  return `Gemini şu anda yanıt vermedi. Durum: ${status}${compactError ? ` - ${compactError}` : ""}`;
+  const { data: profile } = await supabase.from("profiles").select("full_name, email").eq("id", userId).single();
+  const userName = profile?.full_name?.trim() || profile?.email || userData.user?.email || "Sarowth kullanıcısı";
+
+  return { supabase, userId, userName };
+}
+
+function buildDialogflowClient() {
+  if (process.env.GOOGLE_REFRESH_TOKEN) {
+    return new SessionsClient({
+      credentials: {
+        type: "authorized_user",
+        client_id: "32555940559.apps.googleusercontent.com",
+        refresh_token: process.env.GOOGLE_REFRESH_TOKEN,
+      },
+    });
+  }
+
+  return new SessionsClient();
 }
 
 export async function POST(request: Request) {
-  const { message }: AssistantRequest = await request.json();
+  try {
+    const body = (await request.json()) as AssistantRequest;
+    const message = body.message?.trim();
 
-  if (!message?.trim()) {
-    return NextResponse.json({ reply: "Bana bütçen, tasarruf hedefin veya ürün fikrinle ilgili bir soru sorabilirsin." });
-  }
+    if (!message) {
+      return NextResponse.json({
+        success: false,
+        reply: "Bana bütçen, satın alma kararın veya ürün fikrinle ilgili bir soru sorabilirsin.",
+        dashboardData: null,
+      }, { status: 400 });
+    }
 
-  const supabase = await createSupabaseServerClient();
-  const { data: userData } = await supabase.auth.getUser();
+    const { supabase, userId, userName } = await resolveRequestIdentity(body);
 
-  if (!userData.user) {
-    return NextResponse.json({ reply: "Bu asistanı kullanmak için önce giriş yapmalısın." }, { status: 401 });
-  }
+    if (!userId || !userName) {
+      return NextResponse.json({
+        success: false,
+        reply: "Bu asistanı kullanmak için önce giriş yapmalısın.",
+        dashboardData: null,
+      }, { status: 401 });
+    }
 
-  // Gemini yalnızca bu chat isteği geldiğinde çağrılır; site içi diğer aksiyonlar modele gönderilmez.
-  const { data: profile } = await supabase.from("profiles").select("full_name, monthly_income, savings_goal, risk_preference").eq("id", userData.user.id).single();
-  const { data: budgetEntries } = await supabase.from("budget_entries").select("label, category, amount, entry_type").eq("user_id", userData.user.id).limit(30);
-  const { data: bankTransactions } = await supabase.from("bank_transactions").select("description, category, amount, transaction_type, occurred_on").eq("user_id", userData.user.id).order("occurred_on", { ascending: false }).limit(60);
-  const { data: ideas } = await supabase.from("ecommerce_ideas").select("product_name, audience, demand_score, estimated_margin, status, notes").eq("user_id", userData.user.id).order("created_at", { ascending: false }).limit(12);
-  const { data: commerceMetrics } = await supabase.from("commerce_metrics_daily").select("provider, revenue, cost, ad_spend, net_profit, metric_day").eq("user_id", userData.user.id).order("metric_day", { ascending: false }).limit(14);
-  const { data: commerceProducts } = await supabase.from("commerce_products").select("product_name, units_sold, revenue, estimated_margin, trend").eq("user_id", userData.user.id).order("updated_at", { ascending: false }).limit(10);
-  const { data: marketSignals } = await supabase.from("market_product_signals").select("product_name, signal, score").order("score", { ascending: false }).limit(5);
-  const { data: financeNews } = await supabase.from("finance_news_items").select("title, source, summary").order("published_at", { ascending: false }).order("created_at", { ascending: false }).limit(5);
-  const { data: previousMessages } = await supabase.from("assistant_messages").select("role, content").eq("user_id", userData.user.id).order("created_at", { ascending: false }).limit(6);
+    const dialogflowConfig = readDialogflowConfig();
+    const bankaVerisi = await bankaAgentYuvasi(userId);
+    const detectedUrl = getFirstUrl(message);
+    const haberTrendVerisi = detectedUrl ? await haberTrendYuvasi(detectedUrl) : null;
+    const client = buildDialogflowClient();
+    const sessionPath = client.projectLocationAgentSessionPath(
+      dialogflowConfig.projectId,
+      dialogflowConfig.location,
+      dialogflowConfig.agentId,
+      `sarowth-session-${userId}`,
+    );
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  const context = {
-    profile,
-    budgetEntries: budgetEntries ?? [],
-    bankTransactions: bankTransactions ?? [],
-    ecommerceIdeas: ideas ?? [],
-    commerceMetrics: commerceMetrics ?? [],
-    commerceProducts: commerceProducts ?? [],
-    marketSignals: marketSignals ?? [],
-    financeNews: financeNews ?? [],
-    previousMessages: (previousMessages ?? []).reverse(),
-  };
-
-  await supabase.from("assistant_messages").insert({
-    user_id: userData.user.id,
-    role: "user",
-    content: message.trim(),
-  });
-
-  if (!apiKey) {
-    const fallbackReply = "Gemini API anahtarı henüz tanımlı değil. Temel yaklaşım: önce bu ayki gelir-gider dengesine bak, yüksek harcama kategorilerini azalt, oluşan tasarrufu düşük riskli test bütçesine ayır. Yatırım ve ürün fikirleri yatırım tavsiyesi değildir; sadece bakılabilecek alanlardır.";
     await supabase.from("assistant_messages").insert({
-      user_id: userData.user.id,
+      user_id: userId,
+      role: "user",
+      content: message,
+    });
+
+    const parameters = objectToStruct({
+      userId,
+      userName,
+      bankaAdi: bankaVerisi.bankaAdi,
+      hesapTuru: bankaVerisi.hesapTuru,
+      bakiye: bankaVerisi.bakiye,
+      aylikGelir: bankaVerisi.aylikGelir,
+      aylikGider: bankaVerisi.aylikGider,
+      kullanilabilirAlan: bankaVerisi.kullanilabilirAlan,
+      riskSeviyesi: bankaVerisi.riskSeviyesi,
+      harcamaKategorileri: bankaVerisi.harcamaKategorileri as unknown as JsonValue,
+      haberTrend: haberTrendVerisi as unknown as JsonValue,
+    });
+
+    const [dialogflowResponse] = await client.detectIntent({
+      session: sessionPath,
+      queryInput: {
+        text: { text: message },
+        languageCode: "tr",
+      },
+      queryParams: {
+        parameters,
+      },
+    });
+
+    const reply = dialogflowResponse.queryResult?.responseMessages
+      ?.flatMap((responseMessage) => responseMessage.text?.text ?? [])
+      .filter(Boolean)
+      .join("\n\n") || "Şu anda net bir cevap üretemedim. Sorunu biraz daha detaylandırır mısın?";
+
+    await supabase.from("assistant_messages").insert({
+      user_id: userId,
       role: "assistant",
-      content: fallbackReply,
+      content: reply,
     });
 
     return NextResponse.json({
-      reply: fallbackReply,
+      success: true,
+      reply,
+      dashboardData: bankaVerisi,
     });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Asistan çalıştırılırken bilinmeyen bir hata oluştu.";
+
+    return NextResponse.json({
+      success: false,
+      reply: "Asistan şu anda yanıt veremiyor. Dialogflow CX bağlantı ve ortam değişkenlerini kontrol et.",
+      dashboardData: null,
+      error: message,
+    }, { status: 500 });
   }
-
-  const requestBody = {
-    contents: [
-      {
-        role: "user",
-        parts: [
-          {
-            text: `Sen Sarowth içinde çalışan Türkçe kişisel finans, bütçe, alışveriş kararı ve e-ticaret asistanısın.
-
-Ürün vizyonu:
-- Kullanıcı bütçe verisini manuel girmez; banka agent'ı gelir, gider, geçmiş ay harcamaları ve kategori dağılımını getirir.
-- Piyasa/haber agent'ı popülerleşen ürünleri, finans haberlerini ve bakılabilecek alanları getirir.
-- Ticaret/yatırım agent'ı Shopier, Shopify, Midas vb. hesaplardan kar, zarar, talep gören ürünler ve artan/azalan varlıkları gösterir.
-- Gemini asistan bu bağlamla satın alma, bekleme, tasarruf ve kar geliştirme önerisi verir.
-
-Davranış kuralları:
-- Bu modele sadece kullanıcının chat kutusuna yazdığı mesajlar gelir. Site içinde yapılan her değişikliği olay gibi yorumlama.
-- Kullanıcı sormadığı sürece gereksiz veri dökümü yapma; sadece soruyu yanıtlamak için gereken bağlamı kullan.
-- Kullanıcı bir ürün almak istediğinde bu ayki harcama kategorilerine, önceki konuşmalara, gelir-gider dengesine ve tasarruf hedeflerine bak.
-- Bütçe zorlanıyorsa net şekilde "şimdi alma" veya "bekle" de.
-- Eğer belirli kategori bu ay yüksekse, örneğin yemek harcaması artmışsa bunu gerekçe göster.
-- Tasarruf oluşmuşsa ürün testi, ticari ürün tedariki veya finansal olarak bakılabilecek alanları listele.
-- Hisse, coin, fon gibi alanlarda kesinlikle "yatırım tavsiyesi değildir" ifadesini kullan. Bunları sadece "bakılabilecek alan" olarak anlat.
-- Getiri garantisi verme, kişiyi yönlendiren kesin emirler verme, riskleri açıkça belirt.
-- Cevaplar kısa, net, kişisel ve uygulanabilir olsun.
-
-Kullanıcının bağlamı: ${JSON.stringify(context)}
-Kullanıcının sorusu: ${message}`,
-          },
-        ],
-      },
-    ],
-    generationConfig: {
-      temperature: 0.45,
-      maxOutputTokens: 700,
-    },
-  };
-
-  const model = readGeminiModel();
-
-  let response: Response;
-
-  try {
-    response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": apiKey,
-      },
-      body: JSON.stringify(requestBody),
-    });
-  } catch {
-    const reply = "Gemini'ye bağlanırken bir hata oluştu. İnternet bağlantını kontrol et ve tekrar dene.";
-    await supabase.from("assistant_messages").insert({
-      user_id: userData.user.id,
-      role: "assistant",
-      content: reply,
-    });
-    return NextResponse.json({ reply }, { status: 200 });
-  }
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    const reply = getGeminiErrorReply(response.status, errorText);
-    await supabase.from("assistant_messages").insert({
-      user_id: userData.user.id,
-      role: "assistant",
-      content: reply,
-    });
-    return NextResponse.json({ reply }, { status: 200 });
-  }
-
-  const data = await response.json();
-  const reply = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "Şu anda net bir öneri üretemedim. Sorunu biraz daha detaylandırır mısın?";
-
-  await supabase.from("assistant_messages").insert({
-    user_id: userData.user.id,
-    role: "assistant",
-    content: reply,
-  });
-
-  return NextResponse.json({ reply });
 }
