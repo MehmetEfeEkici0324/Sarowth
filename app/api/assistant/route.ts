@@ -37,12 +37,15 @@ interface SupplierLink {
   score: number;
 }
 
-const commandHelp = `Komutlar:
-/al Ürün adı 1200 TL - Satın alma kararını bütçene göre hesaplar.
-/haber konu - Haber agent verilerinde konuyla ilgili sinyal arar.
-/takip ürün adı - Ürün/trend takibi için arama niyetini analiz eder.
-/yatirim bütçe - Oluşan fazla bütçeyle bakılabilecek alanları listeler. Yatırım tavsiyesi değildir.
-/ozet - Gelir, gider, tasarruf ve en yüksek harcama kategorini özetler.`;
+const commandHelp = `Ne yapmak istediğini kısa yazabilirsin.
+
+Alışveriş kararı: al tişört 6000
+Haber analizi: haber e-ticaret
+Ürün takibi: takip stres çarkı
+Yatırım alanı: yatırım
+Bütçe özeti: özet
+
+Slash kullanmak zorunda değilsin. İstersen /al, /haber, /takip, /yatirim, /ozet şeklinde de yazabilirsin.`;
 
 function parseAmount(message: string) {
   const normalized = message.replace(/\./g, "").replace(/,/g, ".");
@@ -52,8 +55,34 @@ function parseAmount(message: string) {
 
 function parseCommand(message: string) {
   const trimmed = message.trim();
-  const command = trimmed.match(/^\/(\S+)/)?.[1]?.toLowerCase() ?? "yardim";
-  const text = trimmed.replace(/^\/\S+\s*/, "").trim();
+  const lower = trimmed.toLocaleLowerCase("tr-TR");
+  const slashCommand = trimmed.match(/^\/(\S+)/)?.[1]?.toLocaleLowerCase("tr-TR");
+
+  if (slashCommand) {
+    return { command: slashCommand, text: trimmed.replace(/^\/\S+\s*/, "").trim() };
+  }
+
+  const aliases = [
+    { command: "al", prefixes: ["al ", "almalı mıyım ", "alayım mı ", "satın al ", "satın alayım mı "] },
+    { command: "haber", prefixes: ["haber ", "haberleri ", "gündem ", "piyasa haberi "] },
+    { command: "takip", prefixes: ["takip ", "izle ", "ürün takip ", "tedarik "] },
+    { command: "yatirim", prefixes: ["yatırım", "yatirim", "fırsat", "firsat"] },
+    { command: "ozet", prefixes: ["özet", "ozet", "bütçe", "butce"] },
+  ];
+
+  for (const alias of aliases) {
+    const prefix = alias.prefixes.find((item) => lower === item.trim() || lower.startsWith(item));
+    if (prefix) {
+      return { command: alias.command, text: trimmed.slice(prefix.length).trim() };
+    }
+  }
+
+  if (parseAmount(trimmed)) {
+    return { command: "al", text: trimmed };
+  }
+
+  const command = "yardim";
+  const text = trimmed;
   return { command, text };
 }
 
@@ -223,6 +252,8 @@ export async function POST(request: Request) {
       reply = buildInvestmentReply(summary);
     } else if (command === "ozet") {
       reply = `Bütçe Özeti\n\nGelir: ₺${summary.income.toLocaleString("tr-TR")}\nGider: ₺${summary.expenses.toLocaleString("tr-TR")}\nTasarruf: ₺${summary.savings.toLocaleString("tr-TR")}\nSerbest alan: ₺${summary.available.toLocaleString("tr-TR")}\nEn yüksek kategori: ${summary.topCategory?.[0] ?? "Yok"}`;
+    } else {
+      reply = commandHelp;
     }
 
     await supabase.from("assistant_messages").insert([
