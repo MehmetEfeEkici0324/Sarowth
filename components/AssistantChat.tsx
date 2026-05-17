@@ -118,8 +118,8 @@ export function AssistantChat({ onDashboardData, initialMessages = [] }: Assista
           <div className="mr-auto inline-flex max-w-[85%] items-center gap-3 rounded-3xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-slate-300">
             <span>Asistan düşünüyor</span>
             <span className="flex items-center gap-1" aria-hidden="true">
-              <span className="h-2 w-2 animate-bounce rounded-full bg-emerald-300 [animation-delay:-0.2s]" />
-              <span className="h-2 w-2 animate-bounce rounded-full bg-emerald-300 [animation-delay:-0.1s]" />
+              <span className="h-2 w-2 animate-bounce rounded-full bg-emerald-300 [animation-delay:-200ms]" />
+              <span className="h-2 w-2 animate-bounce rounded-full bg-emerald-300 [animation-delay:-100ms]" />
               <span className="h-2 w-2 animate-bounce rounded-full bg-emerald-300" />
             </span>
           </div>

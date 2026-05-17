@@ -71,6 +71,9 @@ const searchStopWords = new Set([
 ]);
 
 const genericProductWords = new Set(["scooter", "elektrikli", "electric", "ürün", "urun", "model", "modelleri", "fiyat", "fiyatı", "fiyati"]);
+const genericNewsWords = new Set([
+  "hisse", "hissesi", "stock", "stocks", "share", "shares", "borsa", "piyasa", "market", "finance", "finans", "haber", "haberleri", "news", "son", "son dakika", "güncel", "guncel", "gelişme", "gelisme", "gelişmeleri", "gelismeleri", "ne", "oldu", "olan", "nedir", "hakkında", "hakkinda", "yorum", "analiz", "analizi", "durum", "bugün", "bugun", "neden", "niye", "fiyat", "fiyati", "fiyatı",
+]);
 
 const queryCorrections: Record<string, string> = {
   kaboo: "kaabo",
@@ -168,6 +171,64 @@ function parseRefreshText(text: string) {
     .trim();
 }
 
+function getCoreNewsQuery(query: string) {
+  const normalized = normalizeQuery(query);
+  const withoutPhrases = normalized
+    .replace(/\b(son dakika|ne oldu|son durum|guncel durum|güncel durum|hakkinda haber|hakkında haber)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const tokens = withoutPhrases.split(" ").filter((token) => token && !searchStopWords.has(token) && !genericNewsWords.has(token));
+  return tokens.length > 0 ? tokens.join(" ") : normalized;
+}
+
+function buildNewsSearchQueries(query: string, refresh: boolean) {
+  const normalizedQuery = normalizeQuery(query || "e-ticaret finans");
+  const coreQuery = getCoreNewsQuery(query || "e-ticaret finans");
+  const maybeTicker = coreQuery.split(" ").length === 1 && coreQuery.length <= 6 ? coreQuery.toUpperCase() : coreQuery;
+  const variants = uniqueBy([
+    `"${coreQuery}"`,
+    `${coreQuery} latest news`,
+    `${coreQuery} breaking news`,
+    `${coreQuery} analysis`,
+    `${coreQuery} global market`,
+    `${maybeTicker} stock news`,
+    `${maybeTicker} shares`,
+    `${normalizedQuery} latest`,
+    `${coreQuery} haber`,
+  ], (item) => item);
+  const regions = [
+    { gl: "us", hl: "en" },
+    { gl: "gb", hl: "en" },
+    { gl: "ca", hl: "en" },
+    { gl: "tr", hl: "tr" },
+    { gl: "de", hl: "de" },
+    { gl: "fr", hl: "fr" },
+  ];
+
+  return variants.flatMap((variant, index) => {
+    const region = regions[index % regions.length];
+    return {
+      engine: "google_news",
+      q: variant,
+      ...region,
+      ...(refresh ? { start: String((index + 1) * 10) } : {}),
+    };
+  });
+}
+
+function normalizeComparableUrl(url: string) {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.hostname.replace("www.", "")}${parsed.pathname}`.toLocaleLowerCase("tr-TR");
+  } catch {
+    return url.split("?")[0].toLocaleLowerCase("tr-TR");
+  }
+}
+
+function normalizeComparableTitle(title: string) {
+  return normalizeSearchText(title).replace(/\b(the|a|an|ve|ile|son|latest|news|haber)\b/g, " ").replace(/\s+/g, " ").trim();
+}
+
 function isRefreshRequest(message: string) {
   return /\b(yenile|yeniden|tekrar|refresh|başka|baska)\b/i.test(message);
 }
@@ -208,9 +269,10 @@ function getPurchaseDecision(amount: number, summary: ReturnType<typeof buildBud
 
 function filterNews(query: string, news: NewsItem[]) {
   const normalizedQuery = normalizeQuery(query);
+  const coreQuery = getCoreNewsQuery(query);
   const filtered = news
-    .filter((item) => isRelevantSearchResult(normalizedQuery, `${item.title} ${item.summary ?? ""}`, "news"))
-    .sort((a, b) => scoreSearchMatch(normalizedQuery, `${b.title} ${b.summary ?? ""}`) - scoreSearchMatch(normalizedQuery, `${a.title} ${a.summary ?? ""}`))
+    .filter((item) => isRelevantSearchResult(coreQuery, `${item.title} ${item.summary ?? ""}`, "news") || isRelevantSearchResult(normalizedQuery, `${item.title} ${item.summary ?? ""}`, "news"))
+    .sort((a, b) => scoreSearchMatch(coreQuery, `${b.title} ${b.summary ?? ""}`) - scoreSearchMatch(coreQuery, `${a.title} ${a.summary ?? ""}`))
     .slice(0, 4);
   return filtered.length > 0 ? filtered : news.slice(0, 3);
 }
@@ -418,6 +480,38 @@ function getSearchTokens(query: string) {
     .filter((token) => token && !searchStopWords.has(token) && (token.length > 1 || token === "x"));
 }
 
+function editDistance(a: string, b: string) {
+  if (a === b) return 0;
+  if (!a) return b.length;
+  if (!b) return a.length;
+
+  const previous = Array.from({ length: b.length + 1 }, (_, index) => index);
+  const current = Array.from({ length: b.length + 1 }, () => 0);
+
+  for (let i = 1; i <= a.length; i += 1) {
+    current[0] = i;
+    for (let j = 1; j <= b.length; j += 1) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      current[j] = Math.min(current[j - 1] + 1, previous[j] + 1, previous[j - 1] + cost);
+    }
+    for (let j = 0; j <= b.length; j += 1) previous[j] = current[j];
+  }
+
+  return previous[b.length];
+}
+
+function fuzzyTokenIncludes(candidate: string, token: string) {
+  if (candidate.includes(token)) return true;
+  if (token.length < 4) return false;
+
+  const words = candidate.split(" ").filter(Boolean);
+  return words.some((word) => {
+    if (word.includes(token) || token.includes(word)) return true;
+    const maxDistance = token.length >= 7 ? 2 : 1;
+    return Math.abs(word.length - token.length) <= maxDistance && editDistance(word, token) <= maxDistance;
+  });
+}
+
 function uniqueBy<T>(items: T[], key: (item: T) => string) {
   const seen = new Set<string>();
   return items.filter((item) => {
@@ -434,13 +528,13 @@ function scoreSearchMatch(query: string, candidate: string) {
   const tokens = getSearchTokens(query);
   if (tokens.length === 0) return 0;
 
-  const matchedTokens = tokens.filter((token) => normalizedCandidate.includes(token));
+  const matchedTokens = tokens.filter((token) => fuzzyTokenIncludes(normalizedCandidate, token));
   const essentialTokens = tokens.filter((token) => !genericProductWords.has(token));
-  const matchedEssential = essentialTokens.filter((token) => normalizedCandidate.includes(token));
+  const matchedEssential = essentialTokens.filter((token) => fuzzyTokenIncludes(normalizedCandidate, token));
   const tokenScore = (matchedTokens.length / tokens.length) * 60;
   const essentialScore = essentialTokens.length > 0 ? (matchedEssential.length / essentialTokens.length) * 25 : 15;
   const exactScore = normalizedCandidate.includes(normalizedQuery) ? 35 : 0;
-  const firstTokenScore = tokens[0] && normalizedCandidate.includes(tokens[0]) ? 10 : 0;
+  const firstTokenScore = tokens[0] && fuzzyTokenIncludes(normalizedCandidate, tokens[0]) ? 10 : 0;
 
   return Math.round(Math.min(100, tokenScore + essentialScore + exactScore + firstTokenScore));
 }
@@ -450,9 +544,9 @@ function isRelevantSearchResult(query: string, candidate: string, mode: "product
   if (tokens.length === 0) return true;
 
   const normalizedCandidate = normalizeSearchText(candidate);
-  const matchedTokens = tokens.filter((token) => normalizedCandidate.includes(token));
+  const matchedTokens = tokens.filter((token) => fuzzyTokenIncludes(normalizedCandidate, token));
   const essentialTokens = tokens.filter((token) => !genericProductWords.has(token));
-  const matchedEssential = essentialTokens.filter((token) => normalizedCandidate.includes(token));
+  const matchedEssential = essentialTokens.filter((token) => fuzzyTokenIncludes(normalizedCandidate, token));
   const score = scoreSearchMatch(query, candidate);
 
   if (mode === "news") {
@@ -562,25 +656,22 @@ async function fetchLiveProductBundle(productName: string, region: ReturnType<ty
   return { signals, suppliers, news };
 }
 
-async function fetchLiveNewsBundle(query: string, refresh = false, excludeUrls: string[] = []) {
+async function fetchLiveNewsBundle(query: string, refresh = false, excludeUrls: string[] = [], excludeTitles: string[] = []) {
   const normalizedQuery = normalizeQuery(query || "e-ticaret finans");
-  const responses = await fetchFirstSerpResults<SerpNewsResponse>([
-    { engine: "google_news", q: `"${normalizedQuery}"`, gl: "us", hl: "en", ...(refresh ? { start: "10" } : {}) },
-    { engine: "google_news", q: `${normalizedQuery} latest news stock market`, gl: "us", hl: "en", ...(refresh ? { start: "20" } : {}) },
-    { engine: "google_news", q: `${normalizedQuery} analysis trend shares`, gl: "gb", hl: "en", ...(refresh ? { start: "30" } : {}) },
-    { engine: "google_news", q: `${normalizedQuery} global market finance`, gl: "ca", hl: "en", ...(refresh ? { start: "40" } : {}) },
-    { engine: "google_news", q: `${normalizedQuery} haber son gelişme hisse`, gl: "tr", hl: "tr", ...(refresh ? { start: "10" } : {}) },
-    { engine: "google_news", q: `${normalizedQuery} analyse tendance bourse`, gl: "fr", hl: "fr", ...(refresh ? { start: "10" } : {}) },
-  ]);
+  const coreQuery = getCoreNewsQuery(query || "e-ticaret finans");
+  const excludedUrlSet = new Set(excludeUrls.map(normalizeComparableUrl));
+  const excludedTitleSet = new Set(excludeTitles.map(normalizeComparableTitle));
+  const responses = await fetchFirstSerpResults<SerpNewsResponse>(buildNewsSearchQueries(query, refresh));
   const allResults = uniqueBy(
     responses.flatMap((data) => data.news_results ?? [])
       .filter((item) => item.title && item.link)
-      .filter((item) => !excludeUrls.includes(item.link ?? "")),
+      .filter((item) => !excludedUrlSet.has(normalizeComparableUrl(item.link ?? "")))
+      .filter((item) => !excludedTitleSet.has(normalizeComparableTitle(item.title ?? ""))),
     (item) => item.link ?? item.title ?? "",
   );
   const relevantResults = allResults
-    .filter((item) => isRelevantSearchResult(normalizedQuery, `${item.title} ${item.snippet ?? ""}`, "news"))
-    .sort((a, b) => scoreSearchMatch(normalizedQuery, `${b.title} ${b.snippet ?? ""}`) - scoreSearchMatch(normalizedQuery, `${a.title} ${a.snippet ?? ""}`));
+    .filter((item) => isRelevantSearchResult(coreQuery, `${item.title} ${item.snippet ?? ""}`, "news") || isRelevantSearchResult(normalizedQuery, `${item.title} ${item.snippet ?? ""}`, "news"))
+    .sort((a, b) => scoreSearchMatch(coreQuery, `${b.title} ${b.snippet ?? ""}`) - scoreSearchMatch(coreQuery, `${a.title} ${a.snippet ?? ""}`));
   const selectedResults = relevantResults.length > 0 ? relevantResults : allResults;
 
   return selectedResults.slice(0, 8).map((item) => ({
@@ -756,7 +847,7 @@ export async function POST(request: Request) {
       if (newsQuery) await rememberWatchTopic(supabase, userData.user.id, newsQuery, "news_watch");
       const normalizedText = normalizeQuery(newsQuery);
       const existingNewsForTopic = news.filter((item) => normalizeQuery(item.topic ?? "") === normalizedText);
-      const liveNews = await fetchLiveNewsBundle(newsQuery, refresh, refresh ? existingNewsForTopic.map((item) => item.url) : []);
+      const liveNews = await fetchLiveNewsBundle(newsQuery, refresh, refresh ? existingNewsForTopic.map((item) => item.url) : [], refresh ? existingNewsForTopic.map((item) => item.title) : []);
       await persistLiveAgentResults({ signals: [], news: liveNews, suppliers: [] });
       news = refresh ? liveNews : [...liveNews, ...news.filter((item) => normalizeQuery(item.topic ?? "") === normalizedText)];
       signals = [];
