@@ -99,11 +99,14 @@ interface GeminiResponse {
   }>;
 }
 
+type ProductSearchScope = "local" | "global";
+
 const commandHelp = `Ne yapmak istediğini kısa yazabilirsin.
 
 Alışveriş kararı: al tişört 6000
 Haber analizi: haber e-ticaret
 Ürün takibi: takip ürün adı
+Global ürün arama: takip ürün adı global
 Yatırım alanı: yatırım
 Bütçe özeti: özet
 
@@ -127,7 +130,7 @@ function parseCommand(message: string) {
   const aliases = [
     { command: "al", prefixes: ["al ", "almalı mıyım ", "alayım mı ", "satın al ", "satın alayım mı "] },
     { command: "haber", prefixes: ["haber ", "haberleri ", "gündem ", "piyasa haberi "] },
-    { command: "takip", prefixes: ["takip ", "izle ", "ürün takip ", "tedarik "] },
+    { command: "takip", prefixes: ["takip ", "izle ", "ürün takip ", "ürün ara ", "urun takip ", "urun ara ", "tedarik "] },
     { command: "yatirim", prefixes: ["yatırım", "yatirim", "fırsat", "firsat"] },
     { command: "ozet", prefixes: ["özet", "ozet", "bütçe", "butce"] },
   ];
@@ -146,6 +149,15 @@ function parseCommand(message: string) {
   const command = "yardim";
   const text = trimmed;
   return { command, text };
+}
+
+function parseProductSearchText(text: string) {
+  const trimmed = text.trim();
+  const globalPattern = /(?:\s*-{2,}\s*global|\s+global)$/i;
+  const scope: ProductSearchScope = globalPattern.test(trimmed) ? "global" : "local";
+  const query = trimmed.replace(globalPattern, "").trim();
+
+  return { query, scope };
 }
 
 function buildBudgetSummary(entries: BudgetEntry[]) {
@@ -200,7 +212,7 @@ function buildNewsReply(query: string, news: NewsItem[]) {
   return `Haber Bundle: ${query || "genel piyasa"}\n\n${items.map((item, index) => `${index + 1}. ${item.title}\nKaynak: ${item.source}`).join("\n\n")}\n\nLinkleri sağdaki haber kartlarından açabilirsin. Bu sinyaller karar desteği içindir; tek başına yatırım veya stok alma kararı değildir.`;
 }
 
-function buildTrackingReply(query: string, signals: MarketSignal[], suppliers: SupplierLink[]) {
+function buildTrackingReply(query: string, signals: MarketSignal[], suppliers: SupplierLink[], scope: ProductSearchScope = "local") {
   const normalizedQuery = normalizeQuery(query);
   const matched = signals
     .filter((item) => isRelevantSearchResult(normalizedQuery, `${item.product_name} ${item.signal}`, "product"))
@@ -218,7 +230,7 @@ function buildTrackingReply(query: string, signals: MarketSignal[], suppliers: S
   const signalText = matched.length > 0 ? matched.map((item) => `- ${item.product_name}: ${item.signal} (${item.score}/100)`).join("\n") : "- Trend skoru için yeterli sinyal yok; tedarik kartları üzerinden kontrol et.";
   const supplierText = supplierItems.length > 0 ? `\n\nTedarik kartları hazır:\n${supplierItems.map((item, index) => `${index + 1}. ${item.title} (${item.source}${item.price_text ? `, ${item.price_text}` : ""})`).join("\n")}\n\nLinklere aşağıdaki tedarik kartlarından tıklayabilirsin.` : "\n\nTedarik linkleri: Bu ürün için canlı tedarik sonucu bulunamadı.";
 
-  return `Ürün paketi hazır: ${query}\n\nTrend sinyali:\n${signalText}${supplierText}\n\nAjan notu: Ürün ve fiyat sonuçları konumuna göre bölgesel mağaza/para birimiyle, haber sinyalleri ise global kaynaklardan taranır. Sonuçlar marka/model kelime eşleşmesine göre filtrelendi. Stok almadan önce fiyat, kargo, iade ve düşük bütçeli talep testini kontrol et.`;
+  return `Ürün paketi hazır: ${query}\n\nArama modu: ${scope === "global" ? "Global ürün pazarı, konum para birimi" : "Konuma göre yerel ürün pazarı"}\n\nTrend sinyali:\n${signalText}${supplierText}\n\nAjan notu: Normal takipte ürün ve fiyat sonuçları konumuna göre gelir. Ürün adının sonuna "global" yazarsan global pazardaki ürünler aranır. Fiyat yabancı para birimindeyse anlık kurla bulunduğun yerin para birimine çevrilmeye çalışılır. Haber sinyalleri global kaynaklardan taranır. Sonuçlar marka/model kelime eşleşmesine göre filtrelendi.`;
 }
 
 function buildInvestmentReply(summary: ReturnType<typeof buildBudgetSummary>) {
@@ -314,6 +326,61 @@ function formatRegionalPrice(value: number, currency: string) {
     return new Intl.NumberFormat("tr-TR", { style: "currency", currency, maximumFractionDigits: 0 }).format(value);
   } catch {
     return `${value.toLocaleString("tr-TR")} ${currency}`;
+  }
+}
+
+function detectCurrency(priceText?: string | null) {
+  if (!priceText) return null;
+  const text = priceText.toLocaleUpperCase("tr-TR");
+  if (text.includes("₺") || text.includes(" TL") || text.includes("TRY")) return "TRY";
+  if (text.includes("$") || text.includes("USD")) return "USD";
+  if (text.includes("€") || text.includes("EUR")) return "EUR";
+  if (text.includes("£") || text.includes("GBP")) return "GBP";
+  if (text.includes("CAD")) return "CAD";
+  if (text.includes("AUD")) return "AUD";
+  return null;
+}
+
+function parsePriceAmount(priceText?: string | null) {
+  if (!priceText) return null;
+  const compact = priceText.replace(/\s/g, "");
+  const match = compact.match(/\d+(?:[.,]\d{3})*(?:[.,]\d+)?/);
+  if (!match) return null;
+  const value = match[0];
+  const lastComma = value.lastIndexOf(",");
+  const lastDot = value.lastIndexOf(".");
+  const onlyComma = lastComma >= 0 && lastDot < 0;
+  const onlyDot = lastDot >= 0 && lastComma < 0;
+
+  if ((onlyComma || onlyDot) && value.slice((onlyComma ? lastComma : lastDot) + 1).length === 3) {
+    const amount = Number(value.replace(/[.,]/g, ""));
+    return Number.isFinite(amount) ? amount : null;
+  }
+
+  const decimalSeparator = lastComma > lastDot ? "," : ".";
+  const normalized = value
+    .replace(new RegExp(`\\${decimalSeparator === "," ? "." : ","}`, "g"), "")
+    .replace(decimalSeparator, ".");
+  const amount = Number(normalized);
+  return Number.isFinite(amount) ? amount : null;
+}
+
+async function convertPriceText(priceText: string | null | undefined, targetCurrency: string, fallbackAmount?: number) {
+  const sourceCurrency = detectCurrency(priceText);
+  const amount = parsePriceAmount(priceText) ?? fallbackAmount ?? null;
+  if (!amount || !sourceCurrency || sourceCurrency === targetCurrency) return priceText ?? (fallbackAmount ? formatRegionalPrice(fallbackAmount, targetCurrency) : null);
+
+  try {
+    const response = await fetch(`https://api.frankfurter.app/latest?from=${sourceCurrency}&to=${targetCurrency}`, { cache: "no-store" });
+    if (!response.ok) return priceText ?? null;
+    const data = await response.json() as { rates?: Record<string, number> };
+    const rate = data.rates?.[targetCurrency];
+    if (!rate) return priceText ?? null;
+
+    return `${formatRegionalPrice(amount * rate, targetCurrency)} (${priceText})`;
+  } catch (error) {
+    console.error("PRICE_CONVERSION_ERROR:", error);
+    return priceText ?? null;
   }
 }
 
@@ -419,17 +486,20 @@ async function fetchSerpApi<T>(params: Record<string, string>) {
   }
 }
 
-async function fetchLiveProductBundle(productName: string, region: ReturnType<typeof getSearchRegion>) {
+async function fetchLiveProductBundle(productName: string, region: ReturnType<typeof getSearchRegion>, scope: ProductSearchScope = "local") {
   const normalizedProductName = normalizeQuery(productName);
   const exactQuery = `"${normalizedProductName}"`;
-  const regionalParams: Record<string, string> = { gl: region.gl, hl: region.hl };
+  const regionalParams: Record<string, string> = scope === "global" ? { gl: "us", hl: "en", location: "United States" } : { gl: region.gl, hl: region.hl };
+  regionalParams.currency = region.currency;
   if (region.location) regionalParams.location = region.location;
+  if (scope === "global") regionalParams.location = "United States";
+  const secondaryGlobalParams: Record<string, string> = { gl: "gb", hl: "en", location: "United Kingdom", currency: region.currency };
   const [shoppingResponses, newsResponses] = await Promise.all([
     fetchFirstSerpResults<SerpShoppingResponse>([
       { engine: "google_shopping", q: exactQuery, ...regionalParams },
       { engine: "google_shopping", q: normalizedProductName, ...regionalParams },
-      { engine: "google_shopping", q: `${normalizedProductName} ${region.buyTerms}`, ...regionalParams },
-      { engine: "google_shopping", q: `${normalizedProductName} buy price`, gl: "us", hl: "en", location: "United States" },
+      { engine: "google_shopping", q: `${normalizedProductName} ${scope === "global" ? "buy price" : region.buyTerms}`, ...regionalParams },
+      { engine: "google_shopping", q: `${normalizedProductName} buy price`, ...secondaryGlobalParams },
     ]),
     fetchFirstSerpResults<SerpNewsResponse>([
       { engine: "google_news", q: exactQuery, gl: "us", hl: "en" },
@@ -454,17 +524,17 @@ async function fetchLiveProductBundle(productName: string, region: ReturnType<ty
       .sort((a, b) => scoreSearchMatch(normalizedProductName, `${b.title} ${b.snippet ?? ""}`) - scoreSearchMatch(normalizedProductName, `${a.title} ${a.snippet ?? ""}`)),
     (item) => item.link ?? item.title ?? "",
   ).slice(0, 6);
-  const suppliers: SupplierLink[] = shoppingResults.map((item, index) => ({
+  const suppliers: SupplierLink[] = await Promise.all(shoppingResults.map(async (item, index) => ({
     product_name: normalizedProductName,
     title: item.title as string,
     url: (item.link ?? item.product_link) as string,
     source: item.source ?? "Google Shopping",
-    price_text: item.price ?? (item.extracted_price ? formatRegionalPrice(item.extracted_price, region.currency) : null),
+    price_text: await convertPriceText(item.price, region.currency, item.extracted_price),
     score: Math.max(getLiveScore(index, item), scoreSearchMatch(normalizedProductName, `${item.title} ${item.source ?? ""}`)),
-  }));
+  })));
   const signals: MarketSignal[] = shoppingResults.length > 0 ? [{
     product_name: normalizedProductName,
-    signal: `${shoppingResults.length} alakalı canlı tedarik sonucu bulundu. En güçlü kaynak: ${suppliers[0]?.source ?? "Google Shopping"}${suppliers[0]?.price_text ? `, fiyat: ${suppliers[0].price_text}` : ""}. Arama marka/model eşleşmesine göre filtrelendi.`,
+    signal: `${shoppingResults.length} alakalı canlı tedarik sonucu bulundu. Arama modu: ${scope === "global" ? "global pazar" : "yerel pazar"}. En güçlü kaynak: ${suppliers[0]?.source ?? "Google Shopping"}${suppliers[0]?.price_text ? `, fiyat: ${suppliers[0].price_text}` : ""}. Arama marka/model eşleşmesine göre filtrelendi.`,
     score: suppliers[0]?.score ?? 70,
     source_url: suppliers[0]?.url,
   }] : [];
@@ -586,6 +656,7 @@ Kurallar:
 - Haber, trend ve tedarik linklerini destekleyici sinyal olarak kullan; kesin stok veya yatırım emri verme.
 - Ürün takibi ve haber aramasında sadece verilen marka/model/konu ile eşleşen sonuçları anlat; alakasız genel sonuç uydurma.
 - Ürün ve fiyat sonuçları kullanıcının bölgesine/para birimine göre gelir; haberleri global kaynak sinyali olarak değerlendir.
+- Kullanıcı ürün takibinde ürün adının sonuna "global" yazdıysa ürün pazarı globaldir, fiyat gösterimi kullanıcının konum para birimine çevrilmeye çalışılır.
 - Tedarik sonucu azsa bunu açıkça söyle, eksik veriyi tamamlamaya çalışma.
 - Hisse, fon, coin veya yatırım alanlarında mutlaka "yatırım tavsiyesi değildir" de.
 - Eğer veri yoksa kullanıcıya panelden gelir/gider eklemesini söyle.
@@ -657,6 +728,7 @@ export async function POST(request: Request) {
     const searchRegion = getSearchRegion(request);
 
     let localReply = commandHelp;
+    let dashboardTopic = text || undefined;
 
     if (command === "al") {
       localReply = amount ? getPurchaseDecision(amount, summary) : "Satın alma kararı için tutar yazmalısın. Örnek: al Nike ayakkabı 2400 TL";
@@ -670,16 +742,18 @@ export async function POST(request: Request) {
       suppliers = [];
       localReply = buildNewsReply(text, news);
     } else if (command === "takip") {
-      if (text) await rememberWatchTopic(supabase, userData.user.id, text, "product_watch");
-      if (text) {
-        const normalizedText = normalizeQuery(text);
-        const liveBundle = await fetchLiveProductBundle(text, searchRegion);
+      const productSearch = parseProductSearchText(text);
+      dashboardTopic = productSearch.query || undefined;
+      if (productSearch.query) await rememberWatchTopic(supabase, userData.user.id, productSearch.query, "product_watch");
+      if (productSearch.query) {
+        const normalizedText = normalizeQuery(productSearch.query);
+        const liveBundle = await fetchLiveProductBundle(productSearch.query, searchRegion, productSearch.scope);
         await persistLiveAgentResults(liveBundle);
         signals = [...liveBundle.signals, ...signals.filter((item) => normalizeQuery(item.product_name) === normalizedText)];
         suppliers = [...liveBundle.suppliers, ...suppliers.filter((item) => normalizeQuery(item.product_name) === normalizedText)];
         news = [...liveBundle.news, ...news.filter((item) => normalizeQuery(item.topic ?? "") === normalizedText)];
       }
-      localReply = text ? buildTrackingReply(text, signals, suppliers) : "Takip etmek istediğin ürünü yaz. Örnek: takip ürün adı";
+      localReply = productSearch.query ? buildTrackingReply(productSearch.query, signals, suppliers, productSearch.scope) : "Takip etmek istediğin ürünü yaz. Örnek: takip ürün adı veya takip ürün adı global";
     } else if (command === "yatirim") {
       await rememberWatchTopic(supabase, userData.user.id, "yatırım fırsatları", "investment_watch");
       localReply = buildInvestmentReply(summary);
@@ -708,7 +782,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       reply,
-      dashboardData: buildDashboardData(summary, signals, news, suppliers, text || undefined, command),
+      dashboardData: buildDashboardData(summary, signals, news, suppliers, dashboardTopic, command),
     });
   } catch (error) {
     console.error("ASSISTANT_COMMAND_ENGINE_ERROR:", error);
