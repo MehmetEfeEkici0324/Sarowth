@@ -10,10 +10,11 @@ interface Message {
 
 interface AssistantChatProps {
   onDashboardData?: (dashboardData: unknown) => void;
+  initialMessages?: Message[];
 }
 
-export function AssistantChat({ onDashboardData }: AssistantChatProps) {
-  const [messages, setMessages] = useState<Message[]>([
+export function AssistantChat({ onDashboardData, initialMessages = [] }: AssistantChatProps) {
+  const [messages, setMessages] = useState<Message[]>(initialMessages.length > 0 ? initialMessages : [
     {
       role: "assistant",
       content: "Bana normal cümleyle yazabilirsin. Ürün takibi için ürün adını sen girene kadar beklerim.",

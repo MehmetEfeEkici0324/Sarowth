@@ -48,6 +48,8 @@ interface DashboardData {
 interface AgentIntelligenceWorkspaceProps {
   initialMarketSignals: MarketSignal[];
   initialFinanceNews: FinanceNewsItem[];
+  initialSupplierCards: SupplierCard[];
+  initialMessages: Array<{ role: "user" | "assistant"; content: string }>;
 }
 
 function normalizeDashboardData(value: unknown): DashboardData | null {
@@ -55,10 +57,10 @@ function normalizeDashboardData(value: unknown): DashboardData | null {
   return value as DashboardData;
 }
 
-export function AgentIntelligenceWorkspace({ initialMarketSignals, initialFinanceNews }: AgentIntelligenceWorkspaceProps) {
+export function AgentIntelligenceWorkspace({ initialMarketSignals, initialFinanceNews, initialSupplierCards, initialMessages }: AgentIntelligenceWorkspaceProps) {
   const [marketSignals, setMarketSignals] = useState(initialMarketSignals);
   const [financeNews, setFinanceNews] = useState(initialFinanceNews);
-  const [supplierCards, setSupplierCards] = useState<SupplierCard[]>([]);
+  const [supplierCards, setSupplierCards] = useState<SupplierCard[]>(initialSupplierCards);
 
   function handleDashboardData(value: unknown) {
     const dashboardData = normalizeDashboardData(value);
@@ -99,7 +101,7 @@ export function AgentIntelligenceWorkspace({ initialMarketSignals, initialFinanc
       <SupplierSection supplierCards={supplierCards} />
 
       <div id="assistant" className="mt-6">
-        <AssistantChat onDashboardData={handleDashboardData} />
+        <AssistantChat onDashboardData={handleDashboardData} initialMessages={initialMessages} />
       </div>
     </>
   );

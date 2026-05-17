@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 interface AssistantRequest {
   message?: string;
@@ -328,6 +329,45 @@ async function fetchLiveNewsBundle(query: string) {
   }));
 }
 
+async function persistLiveAgentResults({ signals, news, suppliers }: { signals: MarketSignal[]; news: NewsItem[]; suppliers: SupplierLink[] }) {
+  if (signals.length === 0 && news.length === 0 && suppliers.length === 0) return;
+
+  try {
+    const admin = createSupabaseAdminClient();
+
+    if (signals.length > 0) {
+      await admin.from("market_product_signals").upsert(signals.map((item) => ({
+        product_name: item.product_name,
+        signal: item.signal,
+        score: item.score,
+        source_url: item.source_url ?? null,
+      })), { onConflict: "product_name" });
+    }
+
+    if (news.length > 0) {
+      await admin.from("finance_news_items").upsert(news.map((item) => ({
+        title: item.title,
+        source: item.source,
+        url: item.url,
+        summary: item.summary ?? null,
+      })), { onConflict: "url" });
+    }
+
+    if (suppliers.length > 0) {
+      await admin.from("product_supplier_links").upsert(suppliers.map((item) => ({
+        product_name: item.product_name,
+        title: item.title,
+        url: item.url,
+        source: item.source,
+        price_text: item.price_text ?? null,
+        score: item.score,
+      })), { onConflict: "url" });
+    }
+  } catch (error) {
+    console.error("LIVE_AGENT_PERSIST_ERROR:", error);
+  }
+}
+
 async function generateGeminiReply({
   message,
   command,
@@ -443,12 +483,14 @@ export async function POST(request: Request) {
     } else if (command === "haber") {
       if (text) await rememberWatchTopic(supabase, userData.user.id, text, "news_watch");
       const liveNews = await fetchLiveNewsBundle(text);
+      await persistLiveAgentResults({ signals: [], news: liveNews, suppliers: [] });
       news = [...liveNews, ...news];
       localReply = buildNewsReply(text, news);
     } else if (command === "takip") {
       if (text) await rememberWatchTopic(supabase, userData.user.id, text, "product_watch");
       if (text) {
         const liveBundle = await fetchLiveProductBundle(text);
+        await persistLiveAgentResults(liveBundle);
         signals = [...liveBundle.signals, ...signals];
         suppliers = [...liveBundle.suppliers, ...suppliers];
         news = [...liveBundle.news, ...news];

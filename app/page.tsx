@@ -17,6 +17,8 @@ interface AuthenticatedHomeProps {
   ideas: Array<{ product_name: string; demand_score: number; estimated_margin: number | string; status: string }>;
   marketSignals: Array<{ name: string; signal: string; score: number; source: string }>;
   financeNews: Array<{ title: string; source: string; href: string; time?: string; bundleSummary?: string }>;
+  supplierCards: Array<{ productName: string; title: string; url: string; source: string; price?: string | null; score: number }>;
+  assistantMessages: Array<{ role: "user" | "assistant"; content: string }>;
 }
 
 const defaultMarketSignals: Array<{ name: string; signal: string; score: number; source: string }> = [];
@@ -55,11 +57,13 @@ export default async function HomePage({}: HomePageProps) {
 
     if (data.user) {
       const { data: profile } = await supabase.from("profiles").select("full_name, email, savings_goal").eq("id", data.user.id).single();
-      const [{ data: budgetEntries }, { data: ideas }, { data: signalRows }, { data: newsRows }] = await Promise.all([
+      const [{ data: budgetEntries }, { data: ideas }, { data: signalRows }, { data: newsRows }, { data: supplierRows }, { data: messageRows }] = await Promise.all([
         supabase.from("budget_entries").select("amount, entry_type, category").eq("user_id", data.user.id),
         supabase.from("ecommerce_ideas").select("product_name, demand_score, estimated_margin, status").eq("user_id", data.user.id).order("created_at", { ascending: false }).limit(4),
         supabase.from("market_product_signals").select("product_name, signal, score, source_url").order("score", { ascending: false }).order("created_at", { ascending: false }).limit(6),
         supabase.from("finance_news_items").select("title, source, url, summary").order("published_at", { ascending: false }).order("created_at", { ascending: false }).limit(6),
+        supabase.from("product_supplier_links").select("product_name, title, url, source, price_text, score").order("created_at", { ascending: false }).limit(10),
+        supabase.from("assistant_messages").select("role, content").eq("user_id", data.user.id).order("created_at", { ascending: false }).limit(10),
       ]);
       const marketSignals = (signalRows ?? []).map((row) => {
         let source = "Piyasa Agent";
@@ -84,6 +88,18 @@ export default async function HomePage({}: HomePageProps) {
         time: "Canlı haber",
         bundleSummary: row.summary ? `AJAN NOTU: ${row.summary}` : "AJAN NOTU: Bu haber piyasa sinyalleri için izleniyor; kişisel risk analizi chat sonrası netleşir.",
       }));
+      const supplierCards = (supplierRows ?? []).map((row) => ({
+        productName: row.product_name,
+        title: row.title,
+        url: row.url,
+        source: row.source,
+        price: row.price_text,
+        score: row.score,
+      }));
+      const assistantMessages = (messageRows ?? []).reverse().map((row) => ({
+        role: row.role as "user" | "assistant",
+        content: row.content,
+      }));
       const resolvedUserName = profile?.full_name?.split(" ")[0] ?? profile?.email ?? data.user.email ?? "Profil";
       userName = resolvedUserName;
       authenticatedHome = {
@@ -93,6 +109,8 @@ export default async function HomePage({}: HomePageProps) {
         ideas: ideas ?? [],
         marketSignals: marketSignals.length > 0 ? marketSignals : defaultMarketSignals,
         financeNews: financeNews.length > 0 ? financeNews : defaultFinanceNews,
+        supplierCards,
+        assistantMessages,
       };
     }
   } catch {
@@ -115,7 +133,7 @@ export default async function HomePage({}: HomePageProps) {
   );
 }
 
-function AuthenticatedHome({ userName, profile, budgetEntries, ideas, marketSignals, financeNews }: AuthenticatedHomeProps) {
+function AuthenticatedHome({ userName, profile, budgetEntries, ideas, marketSignals, financeNews, supplierCards, assistantMessages }: AuthenticatedHomeProps) {
   const income = budgetEntries.filter((entry) => entry.entry_type === "income").reduce((sum, entry) => sum + Number(entry.amount), 0);
   const expenses = budgetEntries.filter((entry) => entry.entry_type === "expense").reduce((sum, entry) => sum + Number(entry.amount), 0);
   const savings = budgetEntries.filter((entry) => entry.entry_type === "saving").reduce((sum, entry) => sum + Number(entry.amount), 0);
@@ -170,7 +188,7 @@ function AuthenticatedHome({ userName, profile, budgetEntries, ideas, marketSign
             </div>
           </section>
 
-          <AgentIntelligenceWorkspace initialMarketSignals={marketSignals} initialFinanceNews={financeNews} />
+          <AgentIntelligenceWorkspace initialMarketSignals={marketSignals} initialFinanceNews={financeNews} initialSupplierCards={supplierCards} initialMessages={assistantMessages} />
 
           <section id="spending" className="mt-6 rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl sm:p-8">
             <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
@@ -319,7 +337,8 @@ function InvestmentSection({ income, expenses, savings, topExpense, marketSignal
   const freeCapital = Math.max(0, income - expenses - savings);
   const testBudget = Math.floor(Math.max(0, freeCapital) * 0.25);
   const reserveBudget = Math.floor(Math.max(0, freeCapital) * 0.5);
-  const riskLevel = income === 0 ? "Veri bekleniyor" : expenses / income > 0.8 ? "Kırmızı" : expenses / income > 0.6 ? "Sarı" : "Yeşil";
+  const riskScore = income > 0 ? Math.min(100, Math.round((expenses / income) * 100)) : 0;
+  const riskLevel = income === 0 ? "Veri bekleniyor" : riskScore > 80 ? "Kırmızı" : riskScore > 60 ? "Sarı" : "Yeşil";
   const topSignal = marketSignals[0];
 
   return (
@@ -340,7 +359,7 @@ function InvestmentSection({ income, expenses, savings, topExpense, marketSignal
         </div>
         <div className="rounded-2xl border border-amber-300/15 bg-amber-400/10 p-4">
           <p className="text-xs uppercase tracking-[0.2em] text-amber-200/70">Risk bandı</p>
-          <p className="mt-2 text-2xl font-semibold text-white">{riskLevel}</p>
+          <RiskGauge score={riskScore} label={riskLevel} />
         </div>
       </div>
       <div className="mt-5 grid gap-3">
@@ -354,8 +373,26 @@ function InvestmentSection({ income, expenses, savings, topExpense, marketSignal
           <span className="font-semibold text-white">3. Fren noktası:</span> {topExpense ? `${topExpense[0]} harcaması yüksek. Bu kategoriye yeni harcama eklemeden önce bekleme modu önerilir.` : "Harcama kategorileri girildikçe fren noktası hesaplanır."}
         </div>
       </div>
-      <p className="mt-5 rounded-2xl border border-amber-400/20 bg-amber-400/10 p-4 text-sm leading-6 text-amber-100">Buradaki hisse, coin, fon veya ürün alanları yatırım tavsiyesi değildir. Sadece agent'ların taradığı verilerden oluşan bakılabilecek alanlardır.</p>
     </section>
+  );
+}
+
+function RiskGauge({ score, label }: { score: number; label: string }) {
+  const rotation = -90 + Math.min(100, Math.max(0, score)) * 1.8;
+
+  return (
+    <div className="mt-3">
+      <div className="relative mx-auto h-20 w-40 overflow-hidden">
+        <div className="absolute inset-x-0 top-0 h-40 rounded-full bg-[conic-gradient(from_270deg,#10b981_0deg,#84cc16_55deg,#f59e0b_115deg,#ef4444_180deg,transparent_180deg)] opacity-90" />
+        <div className="absolute inset-x-5 top-5 h-[7.5rem] rounded-full bg-[#161207]" />
+        <div className="absolute bottom-0 left-1/2 h-[3px] w-[64px] origin-left rounded-full bg-white shadow-[0_0_18px_rgba(255,255,255,0.35)] transition-transform duration-700" style={{ transform: `rotate(${rotation}deg)` }} />
+        <div className="absolute bottom-[-6px] left-1/2 h-4 w-4 -translate-x-1/2 rounded-full border border-white/30 bg-[#050505]" />
+      </div>
+      <div className="-mt-1 text-center">
+        <p className="text-3xl font-semibold text-white">{score}/100</p>
+        <p className="mt-1 text-xs font-medium uppercase tracking-[0.2em] text-amber-100/70">{label}</p>
+      </div>
+    </div>
   );
 }
 
