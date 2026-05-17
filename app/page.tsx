@@ -31,9 +31,9 @@ const investmentIdeas = [
 
 const agentConnections = [
   { name: "Bütçe Motoru", status: "Hazır", detail: "Panelden girilen gelir, gider ve kategorileri kişiye özel karar bağlamına çevirir." },
-  { name: "Haber Agent", status: "API bekliyor", detail: "Kullanıcının aradığı konuları takip edip günlük haber bundle'larına dönüştürecek." },
-  { name: "Trend/Tedarik Agent", status: "API bekliyor", detail: "Moda olmaya başlayan ürünleri ve tedarik linklerini bundle olarak gösterecek." },
-  { name: "Gemini Agent", status: "API bekliyor", detail: "Chat komutlarını doğal dile ve kişisel finans stratejisine çevirecek." },
+  { name: "Haber Agent", status: "Canlı", detail: "SerpAPI ve haber tablosundan konuya göre günlük haber bundle'ları üretir." },
+  { name: "Trend/Tedarik Agent", status: "Canlı", detail: "SerpAPI Shopping ile ürün trendlerini ve tedarik linklerini getirir." },
+  { name: "Gemini Agent", status: "Canlı", detail: "Chat kararlarını bütçe, haber ve trend bağlamıyla kişiselleştirir." },
 ];
 
 const statusLabels: Record<string, string> = {
@@ -151,9 +151,9 @@ function AuthenticatedHome({ userName, profile, budgetEntries, ideas, marketSign
               </div>
             </div>
             <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-1">
-              <StatCard label="Bu ayki net alan" value={`₺${cycleCapital.toLocaleString()}`} detail="Banka agent verisiyle otomatik hesaplanacak tutar." />
-              <StatCard label="Aylık hedef" value={`$${Number(profile?.savings_goal ?? 500).toLocaleString()}`} detail="Profilindeki güncel birikim hedefi." />
-              <StatCard label="En yüksek harcama" value={topExpense ? topExpense[0] : "Yok"} detail={topExpense ? `$${topExpense[1].toLocaleString()} harcama görünüyor.` : "Bütçe verisi bekleniyor."} />
+              <StatCard label="Bu ayki net alan" value={`₺${cycleCapital.toLocaleString("tr-TR")}`} detail="Paneldeki gelir, gider ve birikim kayıtlarına göre hesaplandı." />
+              <StatCard label="Aylık hedef" value={profile?.savings_goal && Number(profile.savings_goal) > 0 ? `₺${Number(profile.savings_goal).toLocaleString("tr-TR")}` : "Belirlenmedi"} detail="Profilinden kendin belirleyebilirsin." />
+              <StatCard label="En yüksek harcama" value={topExpense ? topExpense[0] : "Yok"} detail={topExpense ? `₺${topExpense[1].toLocaleString("tr-TR")} harcama görünüyor.` : "Bütçe verisi bekleniyor."} />
             </div>
           </div>
 
@@ -162,7 +162,7 @@ function AuthenticatedHome({ userName, profile, budgetEntries, ideas, marketSign
               <PlugZap className="text-emerald-300" size={22} />
               <h2 className="text-3xl font-semibold tracking-[-0.04em]">Agent bağlantı katmanı</h2>
             </div>
-             <p className="mt-3 max-w-3xl leading-7 text-slate-400">Şimdilik banka verisini panelden sen girersin. Haber, trend/tedarik ve Gemini API bağlantıları eklendiğinde bu katman otomatik agent akışına dönüşür.</p>
+             <p className="mt-3 max-w-3xl leading-7 text-slate-400">Bütçe verisini panelden sen girersin. Haber, trend/tedarik ve Gemini agent'ları canlı API bağlantılarıyla chat sırasında çalışır.</p>
             <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               {agentConnections.map((agent) => (
                 <div key={agent.name} className="rounded-3xl border border-white/10 bg-black/25 p-5">

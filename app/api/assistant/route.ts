@@ -166,10 +166,10 @@ function filterNews(query: string, news: NewsItem[]) {
 function buildNewsReply(query: string, news: NewsItem[]) {
   const items = filterNews(query, news);
   if (items.length === 0) {
-    return "Haber agent verisi henüz boş. Haber API bağlandığında bu komut günlük sinyalleri konuya göre getirecek.";
+    return "Bu konuda canlı haber sonucu bulunamadı. Farklı bir konu deneyebilirsin: haber e-ticaret, haber ödeme sistemleri, haber tekstil.";
   }
 
-  return `Haber Bundle: ${query || "genel piyasa"}\n\n${items.map((item, index) => `${index + 1}. ${item.title}\nKaynak: ${item.source}\nLink: ${item.url}`).join("\n\n")}\n\nAjan notu: Bu sinyaller karar desteği içindir; tek başına yatırım veya stok alma kararı değildir.`;
+  return `Haber Bundle: ${query || "genel piyasa"}\n\n${items.map((item, index) => `${index + 1}. ${item.title}\nKaynak: ${item.source}`).join("\n\n")}\n\nLinkleri sağdaki haber kartlarından açabilirsin. Bu sinyaller karar desteği içindir; tek başına yatırım veya stok alma kararı değildir.`;
 }
 
 function buildTrackingReply(query: string, signals: MarketSignal[], suppliers: SupplierLink[]) {
@@ -181,7 +181,7 @@ function buildTrackingReply(query: string, signals: MarketSignal[], suppliers: S
     return `Takip başlatıldı: ${query}\n\nBu ürün için canlı veri bekleniyor. Agent çalıştığında trend, tedarik ve satış linkleri burada bundle olarak görünecek.`;
   }
 
-  const supplierText = supplierItems.length > 0 ? `\n\nTedarik linkleri:\n${supplierItems.map((item) => `- ${item.title} (${item.source}${item.price_text ? `, ${item.price_text}` : ""})\n  ${item.url}`).join("\n")}` : "\n\nTedarik linkleri: Ürün tedarik API bağlanınca burada listelenecek.";
+  const supplierText = supplierItems.length > 0 ? `\n\nTedarik kartları hazır:\n${supplierItems.map((item, index) => `${index + 1}. ${item.title} (${item.source}${item.price_text ? `, ${item.price_text}` : ""})`).join("\n")}\n\nLinklere aşağıdaki tedarik kartlarından tıklayabilirsin.` : "\n\nTedarik linkleri: Ürün tedarik API bağlanınca burada listelenecek.";
 
   return `Ürün/Trend Bundle: ${query}\n\n${items.map((item) => `- ${item.product_name}: ${item.signal} (${item.score}/100)${item.source_url ? `\n  Kaynak: ${item.source_url}` : ""}`).join("\n")}${supplierText}\n\nAjan notu: Tedarik için önce düşük bütçeli talep testi yap; stok almadan önce fiyat, kargo ve iade riskini hesapla.`;
 }
@@ -194,7 +194,7 @@ function buildInvestmentReply(summary: ReturnType<typeof buildBudgetSummary>) {
   return `Bakılabilecek alanlar: ₺${summary.available.toLocaleString("tr-TR")} serbest bütçe\n\n- %50 acil nakit tamponu\n- %30 düşük bütçeli ürün/reklam testi\n- %20 eğitim, araç veya araştırma bütçesi\n\nHisse, fon, coin veya benzeri alanlar için bu yatırım tavsiyesi değildir. Sadece bakılabilecek risk alanlarını ayırıyorum.`;
 }
 
-function buildDashboardData(summary: ReturnType<typeof buildBudgetSummary>, signals: MarketSignal[], news: NewsItem[]) {
+function buildDashboardData(summary: ReturnType<typeof buildBudgetSummary>, signals: MarketSignal[], news: NewsItem[], suppliers: SupplierLink[]) {
   return {
     banka: {
       gelir: summary.income,
@@ -225,6 +225,14 @@ function buildDashboardData(summary: ReturnType<typeof buildBudgetSummary>, sign
       url: item.url,
       time: "Günlük sinyal",
       bundleSummary: item.summary ? `AJAN NOTU: ${item.summary}` : "AJAN NOTU: Günlük haber sinyali izleniyor; ürün, bütçe veya yatırım kararı için tek başına yeterli değildir.",
+    })),
+    tedarikLinkleri: suppliers.slice(0, 8).map((item) => ({
+      productName: item.product_name,
+      title: item.title,
+      url: item.url,
+      source: item.source,
+      price: item.price_text,
+      score: item.score,
     })),
   };
 }
@@ -308,6 +316,16 @@ async function fetchLiveProductBundle(productName: string) {
   }));
 
   return { signals, suppliers, news };
+}
+
+async function fetchLiveNewsBundle(query: string) {
+  const newsData = await fetchSerpApi<SerpNewsResponse>({ engine: "google_news", q: `${query || "e-ticaret finans"} haber trend`, gl: "tr", hl: "tr" });
+  return (newsData?.news_results ?? []).filter((item) => item.title && item.link).slice(0, 6).map((item) => ({
+    title: item.title as string,
+    source: getSerpNewsSource(item.source),
+    url: item.link as string,
+    summary: item.snippet ?? `${query} için canlı haber sinyali.`,
+  }));
 }
 
 async function generateGeminiReply({
@@ -424,6 +442,8 @@ export async function POST(request: Request) {
       localReply = amount ? getPurchaseDecision(amount, summary) : "Satın alma kararı için tutar yazmalısın. Örnek: al Nike ayakkabı 2400 TL";
     } else if (command === "haber") {
       if (text) await rememberWatchTopic(supabase, userData.user.id, text, "news_watch");
+      const liveNews = await fetchLiveNewsBundle(text);
+      news = [...liveNews, ...news];
       localReply = buildNewsReply(text, news);
     } else if (command === "takip") {
       if (text) await rememberWatchTopic(supabase, userData.user.id, text, "product_watch");
@@ -462,7 +482,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       reply,
-      dashboardData: buildDashboardData(summary, signals, news),
+      dashboardData: buildDashboardData(summary, signals, news, suppliers),
     });
   } catch (error) {
     console.error("ASSISTANT_COMMAND_ENGINE_ERROR:", error);

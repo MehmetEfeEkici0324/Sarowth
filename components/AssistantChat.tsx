@@ -73,9 +73,9 @@ export function AssistantChat({ onDashboardData }: AssistantChatProps) {
         ))}
       </div>
 
-      <div className="mt-6 grid max-h-[26rem] gap-3 overflow-y-auto rounded-3xl border border-white/10 bg-black/25 p-4">
+      <div className="mt-6 grid max-h-[26rem] min-w-0 gap-3 overflow-y-auto overflow-x-hidden rounded-3xl border border-white/10 bg-black/25 p-4">
         {messages.map((message, index) => (
-          <div key={index} className={message.role === "user" ? "ml-auto max-w-[85%] whitespace-pre-wrap rounded-3xl bg-emerald-400 px-4 py-3 text-sm font-medium text-[#03110c]" : "mr-auto max-w-[85%] whitespace-pre-wrap rounded-3xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm leading-6 text-slate-200"}>
+          <div key={index} className={message.role === "user" ? "ml-auto max-w-[85%] overflow-hidden break-words whitespace-pre-wrap rounded-3xl bg-emerald-400 px-4 py-3 text-sm font-medium text-[#03110c]" : "mr-auto max-w-[85%] overflow-hidden break-words whitespace-pre-wrap rounded-3xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm leading-6 text-slate-200"}>
             {message.content}
           </div>
         ))}
