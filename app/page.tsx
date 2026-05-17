@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
-import { ArrowUpRight, BadgeDollarSign, Landmark, Mail, Newspaper, PlugZap, Radar, ShoppingBag } from "lucide-react";
+import { ArrowUpRight, BadgeDollarSign, Landmark, Mail, Newspaper, PlugZap, Radar } from "lucide-react";
 import { AgentIntelligenceWorkspace } from "@/components/AgentIntelligenceWorkspace";
 import { AgentCards } from "@/components/AgentCards";
+import { CommerceAgentPanel } from "@/components/CommerceAgentPanel";
 import { Footer } from "@/components/Footer";
 import { Hero } from "@/components/Hero";
 import { Navbar } from "@/components/Navbar";
@@ -32,13 +33,6 @@ const agentConnections = [
   { name: "Trend/Tedarik Agent", status: "Canlı", detail: "SerpAPI Shopping ile ürün trendlerini ve tedarik linklerini getirir." },
   { name: "Gemini Agent", status: "Canlı", detail: "Chat kararlarını bütçe, haber ve trend bağlamıyla kişiselleştirir." },
 ];
-
-const statusLabels: Record<string, string> = {
-  research: "Araştırma",
-  testing: "Test",
-  launched: "Yayında",
-  paused: "Duraklatıldı",
-};
 
 export const metadata: Metadata = {
   title: "Sarowth | Bütçeni Koru, Fikrini Test Et",
@@ -223,7 +217,7 @@ function AuthenticatedHome({ userName, profile, budgetEntries, ideas, marketSign
 
           <div className="mt-6 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
             <InvestmentSection income={income} expenses={expenses} savings={savings} topExpense={topExpense} marketSignals={marketSignals} />
-            <CommerceReturnsSection ideas={ideas} marketSignals={marketSignals} availableCapital={cycleCapital} />
+            <CommerceAgentPanel ideas={ideas} marketSignals={marketSignals} availableCapital={cycleCapital} />
           </div>
 
         </div>
@@ -341,8 +335,12 @@ function InvestmentSection({ income, expenses, savings, topExpense, marketSignal
   const freeCapital = Math.max(0, income - expenses - savings);
   const testBudget = Math.floor(Math.max(0, freeCapital) * 0.25);
   const reserveBudget = Math.floor(Math.max(0, freeCapital) * 0.5);
-  const riskScore = income > 0 ? Math.min(100, Math.round((expenses / income) * 100)) : 0;
+  const expenseLoad = income > 0 ? expenses / income : 1;
+  const liquidityLoad = income > 0 ? Math.max(0, 1 - freeCapital / income) : 1;
+  const topCategoryLoad = expenses > 0 && topExpense ? topExpense[1] / expenses : 0;
+  const riskScore = income > 0 ? Math.min(100, Math.round(expenseLoad * 55 + liquidityLoad * 30 + topCategoryLoad * 15)) : 0;
   const riskLevel = income === 0 ? "Veri bekleniyor" : riskScore > 80 ? "Güvensiz" : riskScore > 60 ? "Dikkat" : "Güvenli";
+  const riskDetail = income === 0 ? "Gelir ve gider eklenince hesaplanır." : riskScore > 80 ? "Harcama yükü yüksek, yeni test bütçesi açma." : riskScore > 60 ? "Kontrollü ilerle, küçük test dışında harcama yapma." : "Serbest alan sağlıklı, mikro test yapılabilir.";
   const topSignal = marketSignals[0];
 
   return (
@@ -364,6 +362,7 @@ function InvestmentSection({ income, expenses, savings, topExpense, marketSignal
         <div className="rounded-2xl border border-amber-300/15 bg-amber-400/10 p-4">
           <p className="text-xs uppercase tracking-[0.2em] text-amber-200/70">Risk bandı</p>
           <RiskGauge score={riskScore} label={riskLevel} />
+          <p className="mt-2 text-center text-xs leading-5 text-amber-50/70">{riskDetail}</p>
         </div>
       </div>
       <div className="mt-5 grid gap-3">
@@ -399,48 +398,6 @@ function RiskGauge({ score, label }: { score: number; label: string }) {
         <p className={`mt-1 text-xs font-medium uppercase tracking-[0.2em] ${labelClass}`}>{label}</p>
       </div>
     </div>
-  );
-}
-
-function CommerceReturnsSection({ ideas, marketSignals, availableCapital }: { ideas: AuthenticatedHomeProps["ideas"]; marketSignals: AuthenticatedHomeProps["marketSignals"]; availableCapital: number }) {
-  const candidates = ideas.length > 0 ? ideas.map((idea) => ({
-    name: idea.product_name,
-    score: idea.demand_score,
-    detail: `Tahmini marj: %${Number(idea.estimated_margin)} · Durum: ${statusLabels[idea.status] ?? idea.status}`,
-    source: "E-Ticaret fikri",
-  })) : marketSignals.slice(0, 4).map((signal) => ({
-    name: signal.name,
-    score: signal.score,
-    detail: signal.signal,
-    source: signal.source,
-  }));
-  const action = availableCapital > 0 ? "Düşük bütçeli talep testi aç" : "Önce bütçe açığını kapat";
-
-  return (
-    <section className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl sm:p-8">
-      <div className="flex items-center gap-3">
-        <ShoppingBag className="text-blue-300" size={22} />
-        <h2 className="text-2xl font-semibold tracking-[-0.03em]">Ticari agent fırsat panosu</h2>
-      </div>
-      <p className="mt-3 text-sm leading-6 text-slate-400">E-ticaret fikirlerin ve SerpAPI trend sinyalleri tek listede birleşir. Agent her ürüne test aksiyonu ve risk filtresi ekler.</p>
-      <div className="mt-5 grid gap-3">
-        {candidates.length > 0 ? candidates.map((item) => (
-          <div key={item.name} className="rounded-2xl border border-white/10 bg-black/25 p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="font-medium text-white">{item.name}</p>
-                <p className="mt-1 text-xs text-slate-500">Kaynak: {item.source}</p>
-              </div>
-              <span className="rounded-full bg-blue-400/10 px-3 py-1 text-xs font-medium text-blue-100">{item.score}/100</span>
-            </div>
-            <p className="mt-3 text-sm leading-6 text-slate-400">{item.detail}</p>
-            <div className="mt-3 rounded-2xl border border-emerald-300/10 bg-emerald-400/10 p-3 text-sm text-emerald-50">
-              Agent aksiyonu: {action}
-            </div>
-          </div>
-        )) : <p className="rounded-2xl border border-dashed border-white/10 bg-black/25 p-4 leading-7 text-slate-400">Chatte <span className="text-emerald-200">takip ürün adı</span> yaz veya E-Ticaret sayfasında ürün fikri ekle. Agent burada skor, test bütçesi ve tedarik aksiyonunu oluşturur.</p>}
-      </div>
-    </section>
   );
 }
 

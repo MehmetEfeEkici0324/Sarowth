@@ -196,7 +196,7 @@ function buildInvestmentReply(summary: ReturnType<typeof buildBudgetSummary>) {
   return `Bakılabilecek alanlar: ₺${summary.available.toLocaleString("tr-TR")} serbest bütçe\n\n- %50 acil nakit tamponu\n- %30 düşük bütçeli ürün/reklam testi\n- %20 eğitim, araç veya araştırma bütçesi\n\nHisse, fon, coin veya benzeri alanlar için bu yatırım tavsiyesi değildir. Sadece bakılabilecek risk alanlarını ayırıyorum.`;
 }
 
-function buildDashboardData(summary: ReturnType<typeof buildBudgetSummary>, signals: MarketSignal[], news: NewsItem[], suppliers: SupplierLink[]) {
+function buildDashboardData(summary: ReturnType<typeof buildBudgetSummary>, signals: MarketSignal[], news: NewsItem[], suppliers: SupplierLink[], activeTopic?: string, activeCommand?: string) {
   return {
     banka: {
       gelir: summary.income,
@@ -205,6 +205,8 @@ function buildDashboardData(summary: ReturnType<typeof buildBudgetSummary>, sign
       serbestButce: summary.available,
       enYuksekKategori: summary.topCategory?.[0] ?? "Yok",
     },
+    activeTopic: activeTopic ?? null,
+    activeCommand: activeCommand ?? null,
     trendUrunler: signals.slice(0, 3).map((item) => {
       let source = "Piyasa Agent";
       if (item.source_url) {
@@ -529,7 +531,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       reply,
-      dashboardData: buildDashboardData(summary, signals, news, suppliers),
+      dashboardData: buildDashboardData(summary, signals, news, suppliers, text || undefined, command),
     });
   } catch (error) {
     console.error("ASSISTANT_COMMAND_ENGINE_ERROR:", error);

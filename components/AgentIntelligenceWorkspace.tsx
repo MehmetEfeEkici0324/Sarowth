@@ -29,6 +29,8 @@ interface SupplierCard {
 }
 
 interface DashboardData {
+  activeTopic?: string | null;
+  activeCommand?: string | null;
   trendUrunler?: Array<{
     title: string;
     description: string;
@@ -67,6 +69,8 @@ export function AgentIntelligenceWorkspace({ initialMarketSignals, initialFinanc
     const dashboardData = normalizeDashboardData(value);
     if (!dashboardData) return;
 
+    window.dispatchEvent(new CustomEvent("sarowth:agent-dashboard", { detail: dashboardData }));
+
     if (dashboardData.trendUrunler) {
       const nextSignals = dashboardData.trendUrunler.map((item) => ({
         name: item.title,
@@ -77,7 +81,7 @@ export function AgentIntelligenceWorkspace({ initialMarketSignals, initialFinanc
       setMarketSignals(nextSignals.slice(0, 6));
     }
 
-    if (dashboardData.finansHaberleri) {
+    if (dashboardData.finansHaberleri && dashboardData.activeCommand === "haber") {
       const nextNews = dashboardData.finansHaberleri.map((item) => ({
         title: item.title,
         source: item.source,
@@ -85,7 +89,7 @@ export function AgentIntelligenceWorkspace({ initialMarketSignals, initialFinanc
         time: item.time,
         bundleSummary: item.bundleSummary,
       }));
-      setFinanceNews(nextNews.slice(0, 8));
+      setFinanceNews((current) => nextNews.length > 0 ? nextNews.slice(0, 8) : current);
     }
 
     if (dashboardData.tedarikLinkleri) {
