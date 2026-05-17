@@ -120,6 +120,7 @@ async function syncTopic(topic: WatchTopic) {
       title: item.title as string,
       source: getSourceName(item.source),
       url: item.link as string,
+      topic: topic.topic,
       summary: item.snippet ?? `${topic.topic} için günlük haber sinyali.`,
       published_at: item.date ? new Date(item.date).toISOString() : null,
     }));

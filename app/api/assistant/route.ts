@@ -26,6 +26,7 @@ interface NewsItem {
   title: string;
   source: string;
   url: string;
+  topic?: string | null;
   summary?: string | null;
 }
 
@@ -175,16 +176,16 @@ function buildNewsReply(query: string, news: NewsItem[]) {
 
 function buildTrackingReply(query: string, signals: MarketSignal[], suppliers: SupplierLink[]) {
   const matched = signals.filter((item) => `${item.product_name} ${item.signal}`.toLocaleLowerCase("tr-TR").includes(query.toLocaleLowerCase("tr-TR"))).slice(0, 3);
-  const items = matched.length > 0 ? matched : signals.slice(0, 3);
   const supplierItems = suppliers.filter((item) => `${item.product_name} ${item.title}`.toLocaleLowerCase("tr-TR").includes(query.toLocaleLowerCase("tr-TR"))).slice(0, 4);
 
-  if (items.length === 0) {
+  if (matched.length === 0 && supplierItems.length === 0) {
     return `Takip başlatıldı: ${query}\n\nBu ürün için canlı veri bekleniyor. Agent çalıştığında trend, tedarik ve satış linkleri burada bundle olarak görünecek.`;
   }
 
-  const supplierText = supplierItems.length > 0 ? `\n\nTedarik kartları hazır:\n${supplierItems.map((item, index) => `${index + 1}. ${item.title} (${item.source}${item.price_text ? `, ${item.price_text}` : ""})`).join("\n")}\n\nLinklere aşağıdaki tedarik kartlarından tıklayabilirsin.` : "\n\nTedarik linkleri: Ürün tedarik API bağlanınca burada listelenecek.";
+  const signalText = matched.length > 0 ? matched.map((item) => `- ${item.product_name}: ${item.signal} (${item.score}/100)`).join("\n") : "- Trend skoru için yeterli sinyal yok; tedarik kartları üzerinden kontrol et.";
+  const supplierText = supplierItems.length > 0 ? `\n\nTedarik kartları hazır:\n${supplierItems.map((item, index) => `${index + 1}. ${item.title} (${item.source}${item.price_text ? `, ${item.price_text}` : ""})`).join("\n")}\n\nLinklere aşağıdaki tedarik kartlarından tıklayabilirsin.` : "\n\nTedarik linkleri: Bu ürün için canlı tedarik sonucu bulunamadı.";
 
-  return `Ürün/Trend Bundle: ${query}\n\n${items.map((item) => `- ${item.product_name}: ${item.signal} (${item.score}/100)${item.source_url ? `\n  Kaynak: ${item.source_url}` : ""}`).join("\n")}${supplierText}\n\nAjan notu: Tedarik için önce düşük bütçeli talep testi yap; stok almadan önce fiyat, kargo ve iade riskini hesapla.`;
+  return `Ürün paketi hazır: ${query}\n\nTrend sinyali:\n${signalText}${supplierText}\n\nAjan notu: Stok almadan önce fiyat, kargo, iade ve düşük bütçeli talep testini kontrol et.`;
 }
 
 function buildInvestmentReply(summary: ReturnType<typeof buildBudgetSummary>) {
@@ -325,6 +326,7 @@ async function fetchLiveNewsBundle(query: string) {
     title: item.title as string,
     source: getSerpNewsSource(item.source),
     url: item.link as string,
+    topic: query,
     summary: item.snippet ?? `${query} için canlı haber sinyali.`,
   }));
 }
@@ -349,6 +351,7 @@ async function persistLiveAgentResults({ signals, news, suppliers }: { signals: 
         title: item.title,
         source: item.source,
         url: item.url,
+        topic: item.topic ?? null,
         summary: item.summary ?? null,
       })), { onConflict: "url" });
     }
@@ -464,7 +467,7 @@ export async function POST(request: Request) {
     const [{ data: budgetEntries }, { data: marketSignals }, { data: financeNews }, { data: supplierLinks }] = await Promise.all([
       supabase.from("budget_entries").select("label, category, amount, entry_type, occurred_on").eq("user_id", userData.user.id).limit(120),
       supabase.from("market_product_signals").select("product_name, signal, score, source_url").order("score", { ascending: false }).limit(12),
-      supabase.from("finance_news_items").select("title, source, url, summary").order("published_at", { ascending: false }).order("created_at", { ascending: false }).limit(12),
+      supabase.from("finance_news_items").select("title, source, url, topic, summary").order("published_at", { ascending: false }).order("created_at", { ascending: false }).limit(12),
       supabase.from("product_supplier_links").select("product_name, title, url, source, price_text, score").order("score", { ascending: false }).limit(24),
     ]);
 
@@ -484,16 +487,18 @@ export async function POST(request: Request) {
       if (text) await rememberWatchTopic(supabase, userData.user.id, text, "news_watch");
       const liveNews = await fetchLiveNewsBundle(text);
       await persistLiveAgentResults({ signals: [], news: liveNews, suppliers: [] });
-      news = [...liveNews, ...news];
+      news = [...liveNews, ...news.filter((item) => item.topic === text)];
+      signals = [];
+      suppliers = [];
       localReply = buildNewsReply(text, news);
     } else if (command === "takip") {
       if (text) await rememberWatchTopic(supabase, userData.user.id, text, "product_watch");
       if (text) {
         const liveBundle = await fetchLiveProductBundle(text);
         await persistLiveAgentResults(liveBundle);
-        signals = [...liveBundle.signals, ...signals];
-        suppliers = [...liveBundle.suppliers, ...suppliers];
-        news = [...liveBundle.news, ...news];
+        signals = [...liveBundle.signals, ...signals.filter((item) => item.product_name === text)];
+        suppliers = [...liveBundle.suppliers, ...suppliers.filter((item) => item.product_name === text)];
+        news = [...liveBundle.news, ...news.filter((item) => item.topic === text)];
       }
       localReply = text ? buildTrackingReply(text, signals, suppliers) : "Takip etmek istediğin ürünü yaz. Örnek: takip ürün adı";
     } else if (command === "yatirim") {

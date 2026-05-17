@@ -33,7 +33,7 @@ export default async function ProfilePage({}: ProfilePageProps) {
           </label>
           <label className="grid gap-2 text-sm text-slate-300">
             Aylık birikim hedefi
-            <input name="savingsGoal" type="number" min="0" step="1" defaultValue={profile?.savings_goal ?? 500} className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none transition focus:border-blue-400/60 focus:ring-4 focus:ring-blue-400/10" />
+            <input name="savingsGoal" type="number" min="0" step="1" placeholder="Örn. 5000" defaultValue={profile?.savings_goal && Number(profile.savings_goal) !== 500 ? profile.savings_goal : ""} className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none transition focus:border-blue-400/60 focus:ring-4 focus:ring-blue-400/10" />
           </label>
         </div>
         <label className="grid gap-2 text-sm text-slate-300">

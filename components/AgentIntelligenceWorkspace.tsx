@@ -50,6 +50,7 @@ interface AgentIntelligenceWorkspaceProps {
   initialFinanceNews: FinanceNewsItem[];
   initialSupplierCards: SupplierCard[];
   initialMessages: Array<{ role: "user" | "assistant"; content: string }>;
+  lastAgentTopic: string | null;
 }
 
 function normalizeDashboardData(value: unknown): DashboardData | null {
@@ -57,7 +58,7 @@ function normalizeDashboardData(value: unknown): DashboardData | null {
   return value as DashboardData;
 }
 
-export function AgentIntelligenceWorkspace({ initialMarketSignals, initialFinanceNews, initialSupplierCards, initialMessages }: AgentIntelligenceWorkspaceProps) {
+export function AgentIntelligenceWorkspace({ initialMarketSignals, initialFinanceNews, initialSupplierCards, initialMessages, lastAgentTopic }: AgentIntelligenceWorkspaceProps) {
   const [marketSignals, setMarketSignals] = useState(initialMarketSignals);
   const [financeNews, setFinanceNews] = useState(initialFinanceNews);
   const [supplierCards, setSupplierCards] = useState<SupplierCard[]>(initialSupplierCards);
@@ -66,17 +67,17 @@ export function AgentIntelligenceWorkspace({ initialMarketSignals, initialFinanc
     const dashboardData = normalizeDashboardData(value);
     if (!dashboardData) return;
 
-    if (dashboardData.trendUrunler?.length) {
+    if (dashboardData.trendUrunler) {
       const nextSignals = dashboardData.trendUrunler.map((item) => ({
         name: item.title,
         signal: item.description,
         score: Number(item.score.split("/")[0]) || 0,
         source: item.source,
       }));
-      setMarketSignals((current) => [...nextSignals, ...current.filter((item) => !nextSignals.some((next) => next.name.toLocaleLowerCase("tr-TR") === item.name.toLocaleLowerCase("tr-TR")))].slice(0, 6));
+      setMarketSignals(nextSignals.slice(0, 6));
     }
 
-    if (dashboardData.finansHaberleri?.length) {
+    if (dashboardData.finansHaberleri) {
       const nextNews = dashboardData.finansHaberleri.map((item) => ({
         title: item.title,
         source: item.source,
@@ -84,19 +85,19 @@ export function AgentIntelligenceWorkspace({ initialMarketSignals, initialFinanc
         time: item.time,
         bundleSummary: item.bundleSummary,
       }));
-      setFinanceNews((current) => [...nextNews, ...current.filter((item) => !nextNews.some((next) => next.href === item.href))].slice(0, 8));
+      setFinanceNews(nextNews.slice(0, 8));
     }
 
-    if (dashboardData.tedarikLinkleri?.length) {
-      setSupplierCards((current) => [...dashboardData.tedarikLinkleri!, ...current.filter((item) => !dashboardData.tedarikLinkleri!.some((next) => next.url === item.url))].slice(0, 10));
+    if (dashboardData.tedarikLinkleri) {
+      setSupplierCards(dashboardData.tedarikLinkleri.slice(0, 10));
     }
   }
 
   return (
     <>
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
-        <AgentMarketSection marketSignals={marketSignals} />
-        <AgentNewsSection financeNews={financeNews} />
+        <AgentMarketSection marketSignals={marketSignals} lastAgentTopic={lastAgentTopic} />
+        <AgentNewsSection financeNews={financeNews} lastAgentTopic={lastAgentTopic} />
       </div>
       <SupplierSection supplierCards={supplierCards} />
 
@@ -107,13 +108,14 @@ export function AgentIntelligenceWorkspace({ initialMarketSignals, initialFinanc
   );
 }
 
-function AgentMarketSection({ marketSignals }: { marketSignals: MarketSignal[] }) {
+function AgentMarketSection({ marketSignals, lastAgentTopic }: { marketSignals: MarketSignal[]; lastAgentTopic: string | null }) {
   return (
     <section id="market" className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl sm:p-8">
       <div className="flex items-center gap-3">
         <Radar className="text-emerald-300" size={22} />
         <h2 className="text-2xl font-semibold tracking-[-0.03em]">Piyasada yükselen ürünler</h2>
       </div>
+      {lastAgentTopic ? <p className="mt-2 text-sm text-slate-500">Son arama: <span className="text-emerald-200">{lastAgentTopic}</span></p> : null}
       <div className="mt-5 grid gap-3">
         {marketSignals.length > 0 ? marketSignals.map((item) => (
           <div key={item.name} className="min-w-0 rounded-2xl border border-white/10 bg-black/25 p-4">
@@ -169,13 +171,14 @@ function SupplierSection({ supplierCards }: { supplierCards: SupplierCard[] }) {
   );
 }
 
-function AgentNewsSection({ financeNews }: { financeNews: FinanceNewsItem[] }) {
+function AgentNewsSection({ financeNews, lastAgentTopic }: { financeNews: FinanceNewsItem[]; lastAgentTopic: string | null }) {
   return (
     <section id="news" className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl sm:p-8">
       <div className="flex items-center gap-3">
         <Newspaper className="text-blue-300" size={22} />
         <h2 className="text-2xl font-semibold tracking-[-0.03em]">Finans ve e-ticaret haberleri</h2>
       </div>
+      {lastAgentTopic ? <p className="mt-2 text-sm text-slate-500">Son arama: <span className="text-blue-200">{lastAgentTopic}</span></p> : null}
       <div className="mt-5 grid gap-3">
         {financeNews.length > 0 ? financeNews.map((news) => (
           <article key={news.title} className="group rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:border-blue-400/30">

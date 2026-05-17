@@ -24,8 +24,8 @@ export default async function DashboardPage({}: DashboardPageProps) {
   return (
     <AppShell title={`Hoş geldin${profile?.full_name ? `, ${profile.full_name.split(" ")[0]}` : ""}.`} subtitle="Panel, çalışma alanının kısa özetidir. Detaylı agent akışı artık giriş yaptıktan sonra ana sayfada gösterilir.">
       <div className="grid gap-4 md:grid-cols-3">
-        <StatCard label="Döngü sermayesi" value={`$${cycleCapital.toLocaleString()}`} detail="Gelir, gider ve birikim kayıtlarına göre hesaplanan kullanılabilir tutar." />
-        <StatCard label="Aylık hedef" value={`$${Number(profile?.savings_goal ?? 500).toLocaleString()}`} detail="Profilinde belirlediğin güncel birikim hedefi." />
+        <StatCard label="Döngü sermayesi" value={`₺${cycleCapital.toLocaleString("tr-TR")}`} detail="Gelir, gider ve birikim kayıtlarına göre hesaplanan kullanılabilir tutar." />
+        <StatCard label="Aylık hedef" value={profile?.savings_goal && Number(profile.savings_goal) > 0 && Number(profile.savings_goal) !== 500 ? `₺${Number(profile.savings_goal).toLocaleString("tr-TR")}` : "Belirle"} detail="Profil sayfasından kendin belirleyebilirsin." />
         <StatCard label="Ürün fikri" value={`${ideas?.length ?? 0}`} detail="E-Ticaret sayfasında takip ettiğin son fikirler." />
       </div>
 

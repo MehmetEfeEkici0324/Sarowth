@@ -5,7 +5,7 @@ create table if not exists public.profiles (
   avatar_url text,
   role text not null default 'founder',
   monthly_income numeric(12, 2) not null default 0,
-  savings_goal numeric(12, 2) not null default 500,
+  savings_goal numeric(12, 2) not null default 0,
   risk_preference text not null default 'balanced' check (risk_preference in ('careful', 'balanced', 'bold')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -69,10 +69,17 @@ create table if not exists public.finance_news_items (
   title text not null,
   source text not null,
   url text not null,
+  topic text,
   summary text,
   published_at timestamptz,
   created_at timestamptz not null default now()
 );
+
+alter table public.profiles
+alter column savings_goal set default 0;
+
+alter table public.finance_news_items
+add column if not exists topic text;
 
 create table if not exists public.assistant_messages (
   id uuid primary key default gen_random_uuid(),
@@ -294,6 +301,7 @@ create index if not exists market_product_signals_score_idx on public.market_pro
 create unique index if not exists market_product_signals_product_key on public.market_product_signals(product_name);
 create unique index if not exists finance_news_items_url_key on public.finance_news_items(url);
 create index if not exists finance_news_items_published_idx on public.finance_news_items(published_at desc nulls last, created_at desc);
+create index if not exists finance_news_items_topic_created_idx on public.finance_news_items(topic, created_at desc);
 create index if not exists assistant_messages_user_created_idx on public.assistant_messages(user_id, created_at desc);
 create unique index if not exists agent_watch_topics_user_topic_key on public.agent_watch_topics(user_id, lower(topic), intent);
 create index if not exists agent_watch_topics_active_idx on public.agent_watch_topics(status, last_checked_at nulls first, created_at desc);
