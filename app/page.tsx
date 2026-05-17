@@ -280,7 +280,7 @@ function CategoryBar({ category, amount, percent }: { category: string; amount: 
     <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
       <div className="flex items-center justify-between gap-3 text-sm">
         <span className="text-slate-300">{category}</span>
-        <span className="font-mono text-white">${amount.toLocaleString()} · %{percent}</span>
+        <span className="font-mono text-white">₺{amount.toLocaleString("tr-TR")} · %{percent}</span>
       </div>
       <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
         <div className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-blue-500" style={{ width: `${percent}%` }} />
@@ -297,38 +297,80 @@ function SpendingDonut({ categories, total }: { categories: Array<[string, numbe
     ["İhtiyaç", 14],
     ["Diğer", 8],
   ] as Array<[string, number]>;
-  const source = categories.length > 0 && total > 0 ? categories.map(([category, amount]) => [category, Math.round((amount / total) * 100)] as [string, number]) : fallback;
-  const colors = ["#10b981", "#3b82f6", "#a855f7", "#f59e0b", "#64748b"];
-  let cursor = 0;
-  const gradient = source.map(([, percent], index) => {
-    const start = cursor;
-    cursor += percent;
-    return `${colors[index % colors.length]} ${start}% ${cursor}%`;
-  }).join(", ");
+  const source = categories.length > 0 && total > 0
+    ? categories.map(([category, amount]) => ({ category, amount, percent: (amount / total) * 100 }))
+    : fallback.map(([category, percent]) => ({ category, amount: percent, percent }));
+  const colors = ["#10d99a", "#3b82f6", "#a855f7", "#f59e0b", "#22d3ee", "#f43f5e", "#94a3b8"];
+  const radius = 78;
+  const circumference = 2 * Math.PI * radius;
+  let offset = 0;
+  const segments = source.map((item, index) => {
+    const rawLength = (item.percent / 100) * circumference;
+    const visibleLength = item.percent > 0 ? Math.max(rawLength - 2, 5) : 0;
+    const segment = {
+      ...item,
+      color: colors[index % colors.length],
+      dash: `${visibleLength} ${circumference - visibleLength}`,
+      offset: -offset,
+      displayPercent: item.percent < 1 ? "<1" : Math.round(item.percent).toString(),
+    };
+    offset += rawLength;
+    return segment;
+  });
 
   return (
-    <div className="rounded-[2rem] border border-white/10 bg-black/25 p-5">
-      <div className="mx-auto grid h-56 w-56 place-items-center rounded-full" style={{ background: `conic-gradient(${gradient})` }}>
-        <div className="grid h-32 w-32 place-items-center rounded-full bg-[#050505] text-center">
-          <div>
-            <p className="text-3xl font-semibold text-white">%100</p>
-            <p className="text-xs text-slate-500">harcama dağılımı</p>
+    <div className="rounded-[2rem] border border-white/10 bg-black/25 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+      <div className="relative mx-auto h-64 w-64">
+        <svg viewBox="0 0 220 220" className="h-full w-full drop-shadow-[0_18px_30px_rgba(0,0,0,0.35)]" aria-label="Harcama dağılımı grafiği">
+          <circle cx="110" cy="110" r={radius} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="34" />
+          {segments.map((segment) => (
+            <circle
+              key={segment.category}
+              cx="110"
+              cy="110"
+              r={radius}
+              fill="none"
+              stroke={segment.color}
+              strokeWidth="34"
+              strokeLinecap="round"
+              strokeDasharray={segment.dash}
+              strokeDashoffset={segment.offset}
+              transform="rotate(-90 110 110)"
+            />
+          ))}
+        </svg>
+        <div className="absolute inset-0 grid place-items-center text-center">
+          <div className="grid h-32 w-32 place-items-center rounded-full border border-white/10 bg-[#050505]/95 shadow-[0_0_30px_rgba(0,0,0,0.45)]">
+            <div>
+              <p className="text-3xl font-semibold text-white">%100</p>
+              <p className="text-xs text-slate-500">harcama dağılımı</p>
+            </div>
           </div>
         </div>
       </div>
       <div className="mt-5 grid gap-2">
-        {source.map(([category, percent], index) => (
-          <div key={category} className="flex items-center justify-between gap-3 text-sm">
-            <div className="flex items-center gap-2 text-slate-300">
-              <span className="h-3 w-3 rounded-full" style={{ backgroundColor: colors[index % colors.length] }} />
-              {category}
+        {segments.map((segment) => (
+          <div key={segment.category} className="flex items-center justify-between gap-3 rounded-2xl border border-white/5 bg-white/[0.03] px-3 py-2 text-sm">
+            <div className="flex min-w-0 items-center gap-2 text-slate-300">
+              <span className="h-3 w-3 shrink-0 rounded-full shadow-[0_0_12px_currentColor]" style={{ backgroundColor: segment.color, color: segment.color }} />
+              <span className="truncate">
+                {segment.category}
+              </span>
             </div>
-            <span className="font-mono text-white">%{percent}</span>
+            <span className="shrink-0 font-mono text-white">₺{segment.amount.toLocaleString("tr-TR")} · %{segment.displayPercent}</span>
           </div>
         ))}
       </div>
     </div>
   );
+}
+
+function polarPoint(cx: number, cy: number, radius: number, angle: number) {
+  const radians = (angle * Math.PI) / 180;
+  return {
+    x: cx + radius * Math.cos(radians),
+    y: cy - radius * Math.sin(radians),
+  };
 }
 
 function InvestmentSection({ income, expenses, savings, topExpense, marketSignals }: { income: number; expenses: number; savings: number; topExpense?: [string, number]; marketSignals: AuthenticatedHomeProps["marketSignals"] }) {
@@ -382,20 +424,39 @@ function InvestmentSection({ income, expenses, savings, topExpense, marketSignal
 
 function RiskGauge({ score, label }: { score: number; label: string }) {
   const normalizedScore = Math.min(100, Math.max(0, score));
-  const rotation = 180 - normalizedScore * 1.8;
+  const needleAngle = 180 - normalizedScore * 1.8;
+  const needleEnd = polarPoint(100, 100, 68, needleAngle);
   const labelClass = normalizedScore > 80 ? "text-red-200" : normalizedScore > 60 ? "text-amber-100" : "text-emerald-100";
+  const glowClass = normalizedScore > 80 ? "shadow-red-500/20" : normalizedScore > 60 ? "shadow-amber-500/20" : "shadow-emerald-500/20";
 
   return (
     <div className="mt-3">
-      <div className="relative mx-auto h-20 w-40 overflow-hidden">
-        <div className="absolute inset-x-0 top-0 h-40 rounded-full bg-[conic-gradient(from_270deg,#10b981_0deg,#84cc16_55deg,#f59e0b_115deg,#ef4444_180deg,transparent_180deg)] opacity-90" />
-        <div className="absolute inset-x-5 top-5 h-[7.5rem] rounded-full bg-[#161207]" />
-        <div className="absolute bottom-0 left-1/2 h-[3px] w-[64px] origin-left rounded-full bg-white shadow-[0_0_18px_rgba(255,255,255,0.35)] transition-transform duration-700" style={{ transform: `rotate(${rotation}deg)` }} />
-        <div className="absolute bottom-[-6px] left-1/2 h-4 w-4 -translate-x-1/2 rounded-full border border-white/30 bg-[#050505]" />
+      <div className={`relative mx-auto rounded-3xl bg-black/20 p-2 shadow-2xl ${glowClass}`}>
+        <svg viewBox="0 0 200 128" className="h-32 w-full" aria-label={`Risk skoru ${score}/100`}>
+          <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="22" strokeLinecap="round" pathLength="100" />
+          <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#22c55e" strokeWidth="22" strokeLinecap="round" pathLength="100" strokeDasharray="58 100" strokeDashoffset="0" />
+          <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#facc15" strokeWidth="22" strokeLinecap="round" pathLength="100" strokeDasharray="24 100" strokeDashoffset="-58" />
+          <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#ef4444" strokeWidth="22" strokeLinecap="round" pathLength="100" strokeDasharray="18 100" strokeDashoffset="-82" />
+          <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="rgba(255,255,255,0.22)" strokeWidth="1" strokeLinecap="round" />
+          {[0, 25, 50, 75, 100].map((tick) => {
+            const angle = 180 - tick * 1.8;
+            const outer = polarPoint(100, 100, 91, angle);
+            const inner = polarPoint(100, 100, 81, angle);
+            return <line key={tick} x1={inner.x} y1={inner.y} x2={outer.x} y2={outer.y} stroke="rgba(255,255,255,0.45)" strokeWidth="2" strokeLinecap="round" />;
+          })}
+          <line x1="100" y1="100" x2={needleEnd.x} y2={needleEnd.y} stroke="white" strokeWidth="4" strokeLinecap="round" className="drop-shadow-[0_0_10px_rgba(255,255,255,0.55)]" />
+          <circle cx="100" cy="100" r="9" fill="#050505" stroke="rgba(255,255,255,0.55)" strokeWidth="2" />
+          <circle cx="100" cy="100" r="4" fill="white" />
+        </svg>
+        <div className="pointer-events-none absolute inset-x-0 bottom-2 text-center">
+          <p className="text-3xl font-semibold leading-none text-white">{score}/100</p>
+          <p className={`mt-2 text-xs font-semibold uppercase tracking-[0.22em] ${labelClass}`}>{label}</p>
+        </div>
       </div>
-      <div className="-mt-1 text-center">
-        <p className="text-3xl font-semibold text-white">{score}/100</p>
-        <p className={`mt-1 text-xs font-medium uppercase tracking-[0.2em] ${labelClass}`}>{label}</p>
+      <div className="mt-3 grid grid-cols-3 gap-1 text-[10px] font-medium uppercase tracking-[0.12em] text-slate-500">
+        <span className="text-emerald-200/80">Güvenli</span>
+        <span className="text-center text-amber-100/80">Dikkat</span>
+        <span className="text-right text-red-200/80">Riskli</span>
       </div>
     </div>
   );

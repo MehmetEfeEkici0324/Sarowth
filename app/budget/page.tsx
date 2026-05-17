@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { AppShell } from "@/components/AppShell";
-import { FormSubmit } from "@/components/FormSubmit";
+import { BudgetEntryForm } from "@/components/BudgetEntryForm";
 import { StatCard } from "@/components/StatCard";
-import { addBudgetEntry } from "@/app/workspace/actions";
 import { getWorkspace } from "@/lib/auth";
 
 interface BudgetPageProps {}
@@ -11,12 +10,6 @@ const entryTypeLabels: Record<string, string> = {
   income: "Gelir",
   expense: "Gider",
   saving: "Birikim",
-};
-
-const categories = {
-  income: ["Maaş", "Ek iş", "Satış geliri", "İade", "Diğer gelir"],
-  expense: ["Market", "Yemek", "Ulaşım", "Kira", "Fatura", "Abonelik", "E-Ticaret / Giyim", "Sağlık", "Eğitim", "Borç", "Diğer gider"],
-  saving: ["Acil durum", "Yatırım bütçesi", "Ürün test bütçesi", "Birikim hesabı", "Diğer birikim"],
 };
 
 export const metadata: Metadata = {
@@ -40,29 +33,7 @@ export default async function BudgetPage({}: BudgetPageProps) {
         <StatCard label="Birikim" value={`₺${savings.toLocaleString()}`} detail="Ayırdığın güvenli bütçe." />
       </div>
       <div className="mt-6 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
-        <form action={addBudgetEntry} className="grid gap-4 rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl">
-          <h2 className="text-2xl font-semibold">Yeni bütçe kaydı</h2>
-          <p className="text-sm leading-6 text-slate-400">Metinle kategori yazmak yerine hazır kategorilerden seç. Böylece asistan her kullanıcı için daha doğru bütçe hesabı yapar.</p>
-          <select name="entryType" className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-400/10">
-            <option value="expense">Gider</option>
-            <option value="income">Gelir</option>
-            <option value="saving">Birikim</option>
-          </select>
-          <select name="category" className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-400/10">
-            <optgroup label="Gider">
-              {categories.expense.map((category) => <option key={category} value={category}>{category}</option>)}
-            </optgroup>
-            <optgroup label="Gelir">
-              {categories.income.map((category) => <option key={category} value={category}>{category}</option>)}
-            </optgroup>
-            <optgroup label="Birikim">
-              {categories.saving.map((category) => <option key={category} value={category}>{category}</option>)}
-            </optgroup>
-          </select>
-          <input name="label" placeholder="Kayıt adı: örn. Mayıs maaşı, ayakkabı, kira" className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-400/10" />
-          <input name="amount" type="number" min="0" step="0.01" placeholder="Tutar" className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none focus:border-blue-400/60 focus:ring-4 focus:ring-blue-400/10" />
-          <FormSubmit idleLabel="Kaydet" />
-        </form>
+        <BudgetEntryForm />
         <section className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl">
           <h2 className="text-2xl font-semibold">Kayıtların</h2>
           <div className="mt-5 grid gap-3">

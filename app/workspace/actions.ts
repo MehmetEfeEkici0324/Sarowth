@@ -45,9 +45,7 @@ export async function addBudgetEntry(formData: FormData) {
   const entryType = String(formData.get("entryType") ?? "expense");
   const amount = Number(formData.get("amount") ?? 0);
 
-  const allCategories = Object.values(allowedBudgetCategories).flat();
-
-  if (!label || !allowedBudgetCategories[entryType] || !allCategories.includes(category) || !Number.isFinite(amount) || amount <= 0) {
+  if (!label || !allowedBudgetCategories[entryType]?.includes(category) || !Number.isFinite(amount) || amount <= 0) {
     return;
   }
 
