@@ -1,370 +1,505 @@
-# Sarowth Teknik Makalesi
+# Sarowth Geliştirici El Kitabı
 
-## 1. Projenin Tanımı
+Bu doküman Sarowth projesini sıfırdan, yapay zeka desteği kullanmadan geliştirmek isteyen biri için hazırlanmış kapsamlı bir teknik el kitabıdır. Amaç sadece hangi dosyanın ne yaptığını açıklamak değildir. Amaç, projedeki kararların arkasındaki mühendislik mantığını öğretmek, kullanılan teknolojilerin neden seçildiğini anlatmak ve geliştiricinin benzer bir sistemi kendi başına kurabilecek seviyeye gelmesini sağlamaktır.
 
-Sarowth, kişisel finans yönetimi ile e-ticaret fırsat analizini aynı karar destek ekranında birleştiren web tabanlı bir uygulamadır. Projenin temel amacı, kullanıcının bütçe gerçekliğini canlı haber, ürün trendi ve tedarik verileriyle birlikte değerlendirerek daha güvenli finansal ve ticari kararlar almasına yardımcı olmaktır.
+## İçindekiler
 
-Geleneksel bütçe uygulamaları çoğunlukla sadece gelir-gider takibi yapar. Geleneksel ürün araştırma araçları ise kullanıcının kişisel bütçesini bilmez. Sarowth bu iki dünyayı birleştirir: kullanıcı bütçesini girer, sistem bu bütçeden serbest alanı çıkarır, trend ve haber agentları canlı dış veri toplar, chat asistanı da bu bağlamı kullanarak kısa ve uygulanabilir cevaplar verir.
+1. Projenin Amacı
+2. Ürün Mantığı
+3. Öğrenilmesi Gereken Temel Kavramlar
+4. Sistem Mimarisi
+5. Kullanılan Teknolojiler
+6. Kurulum ve Geliştirme Ortamı
+7. Veritabanı Tasarımı
+8. Kimlik Doğrulama Sistemi
+9. Bütçe Modülü
+10. Karar Motoru
+11. Chat Asistanı
+12. Agent Mimarisi
+13. Haber Arama Algoritması
+14. Ürün Arama Algoritması
+15. Fuzzy Eşleşme Mantığı
+16. Yenileme ve Tekrar Önleme Mantığı
+17. Para Birimi ve Konum Mantığı
+18. Gemini Entegrasyonu
+19. SerpAPI Entegrasyonu
+20. Arayüz Bileşenleri
+21. Grafikler ve Veri Görselleştirme
+22. Güvenlik
+23. Performans
+24. Deployment
+25. Sıfırdan Geliştirme Planı
+26. Kod Okuma Rehberi
+27. Geliştirme Disiplini
+28. Gelecek Geliştirmeler
 
-## 2. Ürün Ne İşe Yarar?
+## 1. Projenin Amacı
 
-Sarowth şu temel sorulara cevap verir:
+Sarowth, kişisel bütçe yönetimini canlı haber, ürün trendi ve tedarik sinyalleriyle birleştiren Türkçe bir karar destek sistemidir. Kullanıcı gelir, gider ve birikim kayıtlarını girer. Sistem bu kayıtları kullanarak kullanıcının serbest bütçesini, risk seviyesini ve güvenli test sermayesini hesaplar.
 
-- Bu ürünü mevcut bütçemle almalı mıyım?
-- Bu ay güvenli serbest bütçem ne kadar?
-- Hangi harcama kategorisi bütçemi zorluyor?
-- Küçük bir e-ticaret testi için ne kadar bütçe ayırabilirim?
-- Takip ettiğim ürün için canlı tedarik ve fiyat sonuçları var mı?
-- Belirli bir konu, şirket, hisse veya sektör hakkında global haber sinyalleri neler?
-- Yeni sonuç istediğimde aynı haberleri tekrar görmeden farklı sonuç alabilir miyim?
+Bu proje klasik bir bütçe uygulaması değildir. Klasik bütçe uygulamaları genellikle sadece geçmiş harcamayı gösterir. Sarowth geçmiş veriyi karar desteğine dönüştürür. Kullanıcı “bu ürünü almalı mıyım?”, “bu ürün takip edilebilir mi?”, “bu konuda global haberler neler?” gibi sorular sorduğunda sistem hem kişisel bütçeyi hem de dış veri kaynaklarını birlikte değerlendirir.
 
-Bu soruların cevabı sadece model tarafından tahmin edilmez. Önce uygulamanın deterministik karar motoru çalışır. Daha sonra Gemini, bu kararı Türkçe ve kullanıcı dostu bir anlatıma dönüştürür.
+## 2. Ürün Mantığı
 
-## 3. Kullanıcı Akışı
+Sarowth üç temel problemi çözer.
 
-Kullanıcı email adresiyle kayıt olur. Sistem kullanıcıya 6 haneli doğrulama kodu gönderir. Kullanıcı kodu doğruladıktan sonra panele ulaşır. Panelde aylık gelir, tasarruf hedefi ve risk tercihi gibi profil bilgileri girilebilir. Bütçe sayfasında kullanıcı gelir, gider ve birikim kayıtlarını hazır kategorilerle ekler.
+Birinci problem, kullanıcıların harcama kararlarını gerçek bütçe bağlamından kopuk almasıdır. Bir ürün alınabilir gibi görünebilir ama kullanıcının serbest bütçesi düşükse bu karar risklidir.
 
-Ana ekranda sistem bu kayıtları toplar ve üç ana gösterge üretir: toplam gelir, toplam gider ve toplam tasarruf. Harcama dağılımı donut grafikle, risk seviyesi yarım daire gauge ile gösterilir. Chat alanında kullanıcı doğal cümlelerle sistemle konuşabilir.
+İkinci problem, e-ticaret fikirlerinin rastgele seçilmesidir. Kullanıcı bir ürünü stoklamadan veya reklama para harcamadan önce canlı ürün, tedarik ve haber sinyallerini görebilmelidir.
 
-Örnek komutlar:
+Üçüncü problem, yapay zeka cevaplarının kontrolsüz olmasıdır. Sarowth’ta yapay zeka nihai karar verici değildir. Önce deterministik karar motoru çalışır. Gemini sadece bu kararı daha doğal ve anlaşılır Türkçeyle ifade eder.
 
-- `al ayakkabı 2400`
-- `haber openai güncel gelişmeler`
-- `haber sndl hisse`
-- `ürün takip kaabo wolf warrior x scooter`
-- `ürün takip kaabo wolf warrior x scooter global`
-- `yatırım`
-- `özet`
+## 3. Öğrenilmesi Gereken Temel Kavramlar
+
+Bu projeyi geliştirebilmek için şu kavramları anlamak gerekir:
+
+- Frontend: Kullanıcının gördüğü arayüz.
+- Backend: Server tarafında çalışan veri ve iş mantığı.
+- API: Sistemler arası veri alışverişi sağlayan uç nokta.
+- Database: Kalıcı verilerin saklandığı yapı.
+- Authentication: Kullanıcının kimliğini doğrulama süreci.
+- Authorization: Kullanıcının hangi veriye erişebileceğini belirleme süreci.
+- Agent: Belirli hedef için veri toplayan, işleyen ve kaydeden otomatik görev birimi.
+- Deterministik karar motoru: Aynı girişe aynı sonucu veren, kuralları belli algoritma.
+- LLM: Büyük dil modeli. Bu projede Gemini kullanılır.
+- Fuzzy matching: Birebir aynı olmayan ama benzer metinleri eşleştirme yöntemi.
 
 ## 4. Sistem Mimarisi
 
-Sarowth modern full-stack web mimarisiyle geliştirilmiştir. Ana mimari katmanları şunlardır:
+Sarowth üç katmanlı düşünülmelidir.
 
-## 4.1 Arayüz Katmanı
+Birinci katman arayüz katmanıdır. Next.js ve React bileşenleri bu katmanda çalışır. Kullanıcı bütçe formunu, chat alanını, grafiklerini ve agent panellerini burada görür.
 
-Arayüz `app/` ve `components/` dizinleri üzerine kuruludur. Next.js App Router kullanıldığı için sayfalar dosya sistemi tabanlı route mantığıyla çalışır. React bileşenleri yeniden kullanılabilir parçalara ayrılmıştır.
+İkinci katman uygulama mantığıdır. API route’lar, server action’lar, karar motoru, arama algoritmaları ve agent endpointleri bu katmanda bulunur.
 
-Önemli arayüz bileşenleri:
+Üçüncü katman veri katmanıdır. Supabase PostgreSQL tabloları kullanıcı profillerini, bütçe kayıtlarını, chat geçmişini, haberleri, ürün sinyallerini ve tedarik linklerini saklar.
 
-- `AgentIntelligenceWorkspace`: Haber, ürün sinyali, tedarik linkleri ve chat alanını birleştirir.
-- `AssistantChat`: Kullanıcının mesaj gönderdiği, bekleme animasyonu ve yenile butonlarını yöneten chat bileşenidir.
-- `BudgetEntryForm`: Gelir, gider ve birikim için tür bazlı kategori seçimi sağlar.
-- `CommerceAgentPanel`: Canlı ürün arama sonuçlarını ticari fırsat paketi olarak gösterir.
-- `AppShell`: Girişli panel sayfalarının ortak layout yapısını sağlar.
+Genel veri akışı şöyledir:
 
-## 4.2 API ve Karar Katmanı
-
-Next.js API route yapısı kullanılır. En kritik endpoint `app/api/assistant/route.ts` dosyasıdır. Bu endpoint kullanıcı mesajını alır, komutu ayrıştırır, ilgili verileri Supabase’den çeker, gerekiyorsa SerpAPI çağırır, yerel karar motorunu çalıştırır ve son cevabı üretir.
-
-Diğer agent endpointleri:
-
-- `app/api/agents/intelligence/route.ts`: Takip edilen ürün ve haber konularını SerpAPI ile senkronize eder.
-- `app/api/agents/news/route.ts`: Haber agent görevlerini çalıştırır.
-- `app/api/agents/market/route.ts`: Ürün sinyali kayıtlarını günceller.
-
-## 4.3 Veri Katmanı
-
-Supabase PostgreSQL veritabanı kullanılır. Kullanıcı auth bilgileri, bütçe kayıtları, agent sonuçları ve chat geçmişi veritabanında saklanır.
-
-Önemli tablolar:
-
-- `profiles`: Kullanıcı profil ayarları.
-- `budget_entries`: Gelir, gider ve birikim kayıtları.
-- `assistant_messages`: Chat geçmişi.
-- `agent_watch_topics`: Takip edilen ürün ve haber konuları.
-- `market_product_signals`: Ürün trend sinyalleri.
-- `finance_news_items`: Haber kayıtları.
-- `product_supplier_links`: Tedarik linkleri.
-- `agent_runs`: Agent çalışma logları.
+1. Kullanıcı chat mesajı gönderir.
+2. `/api/assistant` mesajı alır.
+3. Kullanıcı oturumu Supabase ile doğrulanır.
+4. Bütçe kayıtları ve agent verileri çekilir.
+5. Mesaj komuta ayrılır.
+6. Gerekirse SerpAPI çağrılır.
+7. Yerel karar motoru sonuç üretir.
+8. Gemini sadece anlatım katmanı olarak çağrılır.
+9. Cevap ve dashboard verisi client’a döner.
+10. UI haber, ürün ve tedarik panellerini günceller.
 
 ## 5. Kullanılan Teknolojiler
 
-## 5.1 TypeScript
+### TypeScript
 
-TypeScript, JavaScript’in tip güvenliği eklenmiş halidir. Sarowth’ta API response yapıları, bütçe kayıtları, haber sonuçları ve tedarik linkleri interface ile tanımlanır. Bu sayede yanlış veri şekilleri geliştirme aşamasında yakalanır.
+TypeScript, JavaScript’e tip sistemi ekler. Büyük projelerde veri şekillerinin yanlış kullanılmasını önler. Örneğin `BudgetEntry`, `NewsItem`, `SupplierLink` gibi veri tipleri interface ile tanımlanır. Bu sayede bir fonksiyonun hangi veriyi beklediği açık olur.
 
-## 5.2 React
+### React
 
-React, arayüzü bileşenlere ayırarak yönetir. Sarowth’ta chat, grafikler, bütçe formu, haber kartları ve tedarik kartları ayrı bileşenlerdir. Bu yapı hem okunabilirliği hem bakım kolaylığını artırır.
+React arayüzü bileşenlere böler. Bir buton, form, chat alanı veya grafik ayrı bileşen olabilir. Bu yaklaşım aynı kodu tekrar yazmayı azaltır ve bakımı kolaylaştırır.
 
-## 5.3 Next.js
+### Next.js
 
-Next.js, React tabanlı full-stack framework’tür. Sarowth’ta hem sayfalar hem API endpointleri Next.js içinde geliştirilir. Server component yapısı sayesinde kullanıcıya özel veriler güvenli şekilde server tarafında çekilebilir.
+Next.js React üzerine kurulu full-stack framework’tür. Sarowth’ta hem sayfalar hem de API endpointleri Next.js içinde yazılır. App Router kullanıldığı için `app/page.tsx` ana sayfayı, `app/api/assistant/route.ts` chat API’sini temsil eder.
 
-## 5.4 Tailwind CSS
+### Tailwind CSS
 
-Tailwind CSS, utility-first CSS yaklaşımı sunar. Sarowth’un koyu tema, kart yapısı, responsive grid sistemi, animasyonları ve grafik çevresi Tailwind sınıflarıyla oluşturulur.
+Tailwind CSS utility-first yaklaşımı kullanır. Uzun CSS dosyaları yazmak yerine sınıflarla tasarım yapılır. Örneğin `rounded-2xl`, `bg-black/25`, `grid`, `text-slate-400` gibi sınıflar arayüzü hızlı şekillendirir.
 
-## 5.5 Supabase
+### Supabase
 
-Supabase, PostgreSQL tabanlı backend servisidir. Auth, database ve server-side erişim için kullanılır. Sarowth’ta kullanıcı oturumu, bütçe kayıtları, agent verileri ve chat mesajları Supabase üzerinde tutulur.
+Supabase, PostgreSQL tabanlı backend servisidir. Kullanıcı kimlik doğrulama, veritabanı ve server-side erişim için kullanılır. Service role key sadece server tarafında tutulur.
 
-## 5.6 Resend
+### Resend
 
-Resend, email gönderim servisidir. Kullanıcı kayıt ve giriş akışında 6 haneli doğrulama kodu göndermek için kullanılır.
+Resend email gönderim servisidir. Sarowth’ta 6 haneli doğrulama kodlarını kullanıcıya göndermek için kullanılır.
 
-## 5.7 Gemini API
+### Gemini API
 
-Gemini, doğal dil üretim katmanı olarak kullanılır. Sarowth’ta Gemini’ye doğrudan finansal karar verdirilmez. Yerel karar motoru önce sonucu üretir, Gemini bu sonucu kullanıcıya daha anlaşılır ve doğal bir dille anlatır.
+Gemini büyük dil modelidir. Projede finansal kararı doğrudan vermez. Yerel motorun sonucunu daha anlaşılır Türkçeye çevirir.
 
-## 5.8 SerpAPI
+### SerpAPI
 
-SerpAPI, Google News ve Google Shopping sonuçlarına programatik erişim sağlar. Ürün takibi, global haber araması ve tedarik linkleri bu servis üzerinden alınır.
+SerpAPI Google News ve Google Shopping sonuçlarını programatik olarak almamızı sağlar. Haber ve ürün agentlarının dış veri kaynağıdır.
 
-## 5.9 Frankfurter API
+### Frankfurter API
 
-Frankfurter API, döviz kuru dönüşümü için kullanılır. Global ürün aramasında fiyat dolar veya euro gibi farklı para birimindeyse kullanıcının konum para birimine çevrilmeye çalışılır.
+Döviz dönüşümü için kullanılır. Global ürün aramasında dolar veya euro fiyatı kullanıcının yerel para birimine çevrilmeye çalışılır.
 
-## 6. API Kavramı
+## 6. Kurulum ve Geliştirme Ortamı
 
-API, iki yazılım sistemi arasında kontrollü veri alışverişi sağlayan arayüzdür. Sarowth hem kendi API endpointlerine sahiptir hem de harici API’leri kullanır.
+Projeyi sıfırdan kurmak için önce Node.js kurulmalıdır. Ardından Next.js projesi oluşturulur.
 
-Kendi API örnekleri:
+```bash
+npx create-next-app@latest sarowth --typescript
+cd sarowth
+```
 
-- `/api/assistant`: Chat mesajını işler.
-- `/api/agents/intelligence`: Cron veya manuel agent senkronizasyonu yapar.
-- `/api/agents/news`: Haber agent görevlerini yürütür.
-- `/api/agents/market`: Piyasa sinyallerini günceller.
+Gerekli paketler yüklenir.
 
-Harici API örnekleri:
+```bash
+npm install @supabase/ssr @supabase/supabase-js resend lucide-react
+```
 
-- Gemini API: Dil modeli cevabı.
-- SerpAPI: Haber ve ürün sonuçları.
-- Frankfurter API: Kur dönüşümü.
-- Supabase API: Auth ve database işlemleri.
+Geliştirme sunucusu başlatılır.
 
-Bir API isteği genellikle şu aşamalarla çalışır: istemci istek gönderir, server isteği doğrular, gerekli veriyi işler, response döner. Sarowth’ta bu mantık chat mesajından agent sonuçlarına kadar birçok yerde kullanılır.
+```bash
+npm run dev
+```
 
-## 7. Agent Kavramı
+Production build almak için:
 
-Agent, belirli bir hedef için çalışan yazılım birimidir. Sadece komut alan pasif fonksiyon değildir; veri toplar, filtreler, skorlar, kaydeder ve başka sistemlerin kullanabileceği anlamlı çıktılar üretir.
+```bash
+npm run build
+```
 
-Sarowth içindeki agentlar:
+## 7. Veritabanı Tasarımı
 
-- Haber agentı: Konu veya şirket hakkında global haber kaynaklarını tarar.
-- Ürün agentı: Ürün adı, marka ve model bilgisine göre tedarik sonuçlarını bulur.
-- Intelligence agent: Takip edilen konuları periyodik olarak işler.
-- Market agent: Trend ürün sinyallerini veritabanına yazar.
-- Chat karar agentı: Bütçe, haber ve ürün sinyallerini birleştirerek cevap üretir.
+Veritabanı tasarımında en önemli nokta veriyi doğru parçalara ayırmaktır. Kullanıcı profili, bütçe kayıtları, chat mesajları ve agent sonuçları ayrı tablolarda tutulur.
 
-Agent mantığının avantajı, sistemin sadece chat balonu üretmemesidir. Arka planda veri işleme döngüsü kurulur. Bu veri daha sonra panel, risk kartı, tedarik kartı ve ticari fırsat panosunda yeniden kullanılabilir.
+Temel tablolar:
 
-## 8. Karar Motoru
+- `profiles`: Kullanıcı adı, aylık gelir, tasarruf hedefi, risk tercihi.
+- `budget_entries`: Her gelir, gider ve birikim kaydı.
+- `assistant_messages`: Chat geçmişi.
+- `agent_watch_topics`: Takip edilen ürün veya haber konusu.
+- `market_product_signals`: Ürün trend sinyalleri.
+- `finance_news_items`: Haber sonuçları.
+- `product_supplier_links`: Tedarik sonuçları.
+- `agent_runs`: Agent çalışma logları.
 
-Sarowth’un en önemli tasarım kararı, finansal kararın tamamen dil modeline bırakılmamasıdır. Satın alma kararında önce yerel karar motoru çalışır.
+Bir bütçe kaydı şu alanlardan oluşur:
 
-Motor şu verileri kullanır:
+- `user_id`: Kaydın hangi kullanıcıya ait olduğu.
+- `label`: Kullanıcıya görünen kayıt adı.
+- `category`: Market, kira, maaş gibi kategori.
+- `amount`: Tutar.
+- `entry_type`: `income`, `expense` veya `saving`.
+- `occurred_on`: Tarih.
+
+## 8. Kimlik Doğrulama Sistemi
+
+Sarowth sosyal login kullanmaz. Email ve 6 haneli kod doğrulama kullanır. Bu akışın amacı sade, anlaşılır ve platform bağımsız bir giriş sistemi kurmaktır.
+
+Akış şöyledir:
+
+1. Kullanıcı email adresini girer.
+2. Sistem 6 haneli kod üretir.
+3. Kod hashlenerek saklanır.
+4. Resend ile kullanıcıya gönderilir.
+5. Kullanıcı kodu girer.
+6. Kod doğruysa Supabase oturumu oluşturulur.
+
+Kodların düz metin saklanmaması önemlidir. Hash mantığı, veritabanı sızıntısı durumunda kodların doğrudan okunmasını engeller.
+
+## 9. Bütçe Modülü
+
+Bütçe modülü kullanıcının finansal kararlarının temelidir. Bu yüzden kategori seçimi serbest metin değil kontrollü listedir. Kullanıcı önce kayıt türünü seçer: gelir, gider veya birikim. Sonra sadece o türe ait kategoriler gösterilir.
+
+Bu tasarımın avantajları:
+
+- Veri temiz kalır.
+- Harcama analizi daha doğru yapılır.
+- Chat karar motoru kategori baskısını güvenilir hesaplar.
+- Kullanıcı yanlışlıkla gelir kategorisini gider olarak seçemez.
+
+Server action tarafında kategori doğrulaması mutlaka yapılır. Client tarafında seçimi kısıtlamak tek başına yeterli değildir; kötü niyetli kullanıcı doğrudan request gönderebilir. Bu yüzden `addBudgetEntry` fonksiyonu seçilen kategorinin seçilen türle uyumlu olup olmadığını kontrol eder.
+
+## 10. Karar Motoru
+
+Karar motoru kullanıcının satın alma isteğini değerlendirir. Örneğin kullanıcı `al ayakkabı 2400` yazdığında sistem önce tutarı ayrıştırır, sonra kullanıcının bütçe özetini çıkarır.
+
+Bütçe özeti şunları hesaplar:
 
 - Toplam gelir.
 - Toplam gider.
 - Toplam birikim.
 - Serbest bütçe.
-- Satın alınmak istenen ürün tutarı.
-- Harcama-gelir oranı.
+- Kategori bazlı giderler.
 - En yüksek gider kategorisi.
 
-Temel kararlar:
+Karar kuralları genel olarak şöyledir:
 
-- `ALINABİLİR`: Satın alma sonrası güvenli alan korunuyorsa.
-- `BEKLE`: Satın alma mümkün ama serbest bütçeyi fazla zorluyorsa.
-- `ALMA`: Satın alma güvenli bütçe dışına çıkarıyorsa.
+- Gelir yoksa karar `BEKLE`.
+- Ürün serbest bütçeden büyükse karar `ALMA`.
+- Satın alma sonrası güvenli tampon çok düşüyorsa karar `ALMA`.
+- Harcama oranı yüksekse karar `BEKLE`.
+- Serbest bütçe korunuyorsa karar `ALINABİLİR`.
 
-Bu karar daha sonra Gemini’ye context olarak verilir. Prompt içinde Gemini’ye bu kararı bozmaması söylenir. Böylece modelin keyfi veya halüsinatif finansal tavsiye üretmesi engellenir.
+Bu yapı deterministiktir. Aynı bütçe ve aynı tutar girildiğinde aynı karar döner. Finansal uygulamalarda bu özellik önemlidir çünkü kullanıcıya tutarlı davranış sağlar.
 
-## 9. Haber Arama Algoritması
+## 11. Chat Asistanı
 
-Haber aramasında kullanıcının yazdığı cümle doğrudan arama motoruna gönderilmez. Önce normalize edilir ve ana konu çıkarılır.
+Chat asistanı iki parçadan oluşur: frontend bileşeni ve backend API.
+
+Frontend tarafında `AssistantChat` bileşeni kullanıcının mesajını alır, API’ye gönderir ve gelen cevabı gösterir. Ayrıca bekleme animasyonu, yenile butonları ve önceki sonuç dışlama listesini yönetir.
+
+Backend tarafında `/api/assistant` mesajı işler. Önce komut ayrıştırılır. Komutlar şunlardır:
+
+- `al`: Satın alma kararı.
+- `haber`: Haber araması.
+- `takip`: Ürün takibi.
+- `yatirim`: Yatırım alanı analizi.
+- `ozet`: Bütçe özeti.
+
+Kullanıcı slash komut yazmak zorunda değildir. Doğal dilde yazdığı basit ifadeler prefix listeleriyle komuta dönüştürülür.
+
+## 12. Agent Mimarisi
+
+Agent, belirli bir görevi otonom veya yarı otonom şekilde yürüten yazılım birimidir. Sarowth’ta agent kavramı gerçek veri işleyen servis mantığıyla kullanılır.
+
+Haber agentı belirli konular için global haber araması yapar. Ürün agentı ürün adı için tedarik ve fiyat sonuçları bulur. Intelligence agent takip edilen konuları periyodik olarak işler. Market agent trend ürün sinyallerini günceller.
+
+Agent kullanmanın avantajı şudur: Sistem sadece kullanıcı mesajına cevap veren bir chat uygulaması olmaz. Arka planda veri toplama, skor üretme, kayıt yazma ve panel güncelleme döngüsü oluşur.
+
+## 13. Haber Arama Algoritması
+
+Haber aramasında en önemli problem kullanıcının yazdığı cümlenin doğrudan iyi bir arama sorgusu olmamasıdır. Kullanıcı `tesla hissesi son durum` yazabilir. Burada ana konu `tesla`, diğer kelimeler bağlam veya niyettir.
+
+Algoritma şu adımları izler:
+
+1. Metni normalize eder.
+2. Gereksiz haber kelimelerini çıkarır.
+3. Ana konuyu belirler.
+4. Ana konu üzerinden farklı global sorgular üretir.
+5. SerpAPI Google News çağrıları yapar.
+6. Sonuçları fuzzy eşleşme ile filtreler.
+7. Skora göre sıralar.
+8. Dashboard payload’ına dönüştürür.
+
+Örnek konu çıkarımı:
+
+- `sndl hisse` -> `sndl`
+- `openai hakkında son haberler` -> `openai`
+- `bitcoin neden düştü` -> `bitcoin`
+- `tesla hissesi son durum` -> `tesla`
+
+Bu yaklaşım sadece belirli bir hisseye özel değildir. Her haber sorgusunda ana konu çıkarımı yapılır.
+
+## 14. Ürün Arama Algoritması
+
+Ürün aramasında amaç genel kategori sonuçlarını değil, marka ve modele uygun sonuçları bulmaktır. Kullanıcı `kaabo wolf warrior x scooter` yazdığında sadece scooter kelimesi geçen sonuçlar yeterli değildir. Kaabo, Wolf, Warrior ve X tokenları da dikkate alınmalıdır.
+
+Algoritma şu adımları izler:
+
+1. Ürün adı normalize edilir.
+2. Bilinen yazım hataları düzeltilir.
+3. Yerel veya global arama modu belirlenir.
+4. Google Shopping sorguları oluşturulur.
+5. Sonuçlar marka/model eşleşmesine göre skorlanır.
+6. Alakasız sonuçlar elenir.
+7. Fiyat yerel para birimine çevrilmeye çalışılır.
+8. Tedarik kartları panelde gösterilir.
+
+Global ürün araması için kullanıcı ürün adının sonuna `global` yazar. Örneğin:
+
+```text
+ürün takip kaabo wolf warrior x scooter global
+```
+
+Bu durumda ürün global pazarda aranır ama fiyat kullanıcının bulunduğu ülkenin para birimine çevrilmeye çalışılır.
+
+## 15. Fuzzy Eşleşme Mantığı
+
+Fuzzy eşleşme birebir aynı olmayan metinleri benzerlik üzerinden değerlendirme yöntemidir. Bu projede iki yerde kullanılır: haber araması ve ürün araması.
+
+Fuzzy eşleşme için şu teknikler kullanılır:
+
+- Küçük harfe çevirme.
+- Türkçe karakter normalizasyonu.
+- Noktalama temizleme.
+- Stop word çıkarma.
+- Token bazlı eşleşme.
+- Edit distance hesaplama.
+- Benzerlik skoru üretme.
+
+Edit distance, iki kelimenin birbirine dönüşmesi için gereken minimum karakter değişikliği sayısıdır. Örneğin bir harf hatası varsa sistem sonucu tamamen çöpe atmaz.
+
+## 16. Yenileme ve Tekrar Önleme Mantığı
+
+Yenileme özelliği kullanıcı aynı haberleri veya ürünleri tekrar görmek istemediğinde kullanılır. Burada önemli olan sadece yeni API çağrısı yapmak değildir. Yeni çağrı aynı sonuçları döndürürse kullanıcı deneyimi kötü olur.
+
+Bu nedenle client mevcut ekrandaki başlıkları ve URL’leri API’ye gönderir. Server bu listeyi dışlama listesi olarak kullanır.
+
+Tekrar önleme şu yöntemlerle yapılır:
+
+- URL normalize edilir.
+- Query parametreleri yok sayılır.
+- Başlık normalize edilir.
+- Başlık token benzerliği hesaplanır.
+- Benzer başlıklı haberler elenir.
+
+Eğer yeni ve farklı sonuç yoksa sistem eski sonuçları tekrar basmak yerine kullanıcıya farklı sonuç bulunamadığını söyler.
+
+## 17. Para Birimi ve Konum Mantığı
+
+Konum bilgisi Vercel veya Cloudflare headerları üzerinden okunur. Eğer header yoksa `Accept-Language` fallback olarak kullanılır. Ülkeye göre para birimi belirlenir.
 
 Örnekler:
 
-- `sndl hisse` -> ana konu: `sndl`
-- `tesla hissesi son durum` -> ana konu: `tesla`
-- `openai hakkında güncel haber` -> ana konu: `openai`
-- `bitcoin son dakika` -> ana konu: `bitcoin`
+- Türkiye -> TRY
+- ABD -> USD
+- İngiltere -> GBP
+- Almanya -> EUR
+- Kanada -> CAD
+- Avustralya -> AUD
 
-Bu işlem için yardımcı kelimeler ayıklanır. `hisse`, `haber`, `son`, `güncel`, `ne oldu`, `analiz`, `piyasa` gibi kelimeler ana konu dışına alınır. Daha sonra birden fazla global arama varyasyonu üretilir:
+Global ürün aramasında ürün dünya pazarında aranır. Ancak fiyat gösterimi kullanıcının para birimine çevrilmeye çalışılır. Dönüşüm Frankfurter API ile yapılır. Eğer kur servisi cevap vermezse orijinal fiyat korunur.
 
-- Tam konu araması.
-- Latest news.
-- Breaking news.
-- Analysis.
-- Global market.
-- Eğer konu kısa ticker gibi görünüyorsa stock news ve shares varyasyonları.
-- Türkçe haber varyasyonu.
+## 18. Gemini Entegrasyonu
 
-Sonuçlar fuzzy eşleşme algoritmasıyla kontrol edilir. Küçük yazım hatalarında sonuç tamamen dışlanmaz. Ancak alakasız haberlerin geçmesini engellemek için token eşleşme skoru hesaplanır.
+Gemini entegrasyonunda en önemli prensip şudur: Model karar vermez, anlatır.
 
-## 10. Fuzzy Eşleşme Algoritması
+Backend önce yerel karar motorunu çalıştırır. Bu karar `deterministicDecision` olarak Gemini context’ine verilir. Prompt içinde modelden bu kararı bozmaması istenir. Böylece modelin finansal kararları rastgele değiştirmesi engellenir.
 
-Fuzzy eşleşme, metinlerin birebir aynı olmasını beklemeden benzer olup olmadığını ölçer. Sarowth’ta bu yaklaşım hem haber hem ürün aramasında kullanılır.
+Bu yaklaşımın avantajları:
 
-Temel adımlar:
+- Daha düşük maliyet.
+- Daha düşük halüsinasyon riski.
+- Daha tutarlı finansal kararlar.
+- API kotası daha kontrollü kullanılır.
+- Model hatasında local fallback devam eder.
 
-1. Metin küçük harfe çevrilir.
-2. Türkçe karakter ve noktalama normalize edilir.
-3. Gereksiz kelimeler çıkarılır.
-4. Arama tokenları çıkarılır.
-5. Sonuç başlığı ve açıklamasında bu tokenların geçip geçmediği kontrol edilir.
-6. Küçük yazım hataları için edit distance hesaplanır.
-7. Sonuca skor verilir.
+## 19. SerpAPI Entegrasyonu
 
-Edit distance, iki kelimeyi birbirine dönüştürmek için kaç karakter ekleme, silme veya değiştirme gerektiğini ölçer. Örneğin `kaboo` ve `kaabo` birebir aynı değildir ama düzeltme tablosu ve fuzzy mantık sayesinde Kaabo markasına yakın kabul edilir.
+SerpAPI iki amaçla kullanılır:
 
-## 11. Ürün Arama Algoritması
+- Google News sonuçları.
+- Google Shopping sonuçları.
 
-Ürün aramasında temel hedef, genel kategori sonuçları yerine marka/model uyumlu sonuçları getirmektir. Örneğin kullanıcı `kaabo wolf warrior x scooter` yazdığında sadece `scooter` geçen sonuçlar yeterli kabul edilmez. Marka ve model tokenlarının da eşleşmesi gerekir.
+SerpAPI çağrılarında tek sorguya güvenilmez. Birden fazla sorgu varyasyonu oluşturulur. Bu, sonuç bulma ihtimalini artırır. Ancak daha sonra filtreleme yapılmazsa alakasız sonuçlar gelebilir. Bu yüzden sorgu genişletme ve sonuç filtreleme birlikte kullanılır.
 
-Ürün arama aşamaları:
+## 20. Arayüz Bileşenleri
 
-1. Ürün adı normalize edilir.
-2. Bilinen typo düzeltmeleri uygulanır.
-3. Yerel veya global arama modu seçilir.
-4. Google Shopping için birden fazla sorgu üretilir.
-5. Sonuç başlıkları marka/model skoruna göre filtrelenir.
-6. Tedarik linkleri skorlanır.
-7. Fiyat metni kullanıcının konum para birimine çevrilmeye çalışılır.
-8. Sonuçlar Supabase’e yazılır.
+Arayüz bileşenleri mümkün olduğunca sorumluluklarına göre ayrılmıştır.
 
-Global ürün araması için kullanıcı ürün adının sonuna `global` yazar. Örneğin `ürün takip kaabo wolf warrior x scooter global`. Bu durumda global pazar aranır fakat fiyat gösterimi kullanıcının konum para birimine çevrilmeye çalışılır.
+- `AssistantChat`: Chat mesajı, loading animasyonu, yenileme butonu.
+- `AgentIntelligenceWorkspace`: Haber ve ürün panellerini yönetir.
+- `BudgetEntryForm`: Bütçe kaydı formu.
+- `CommerceAgentPanel`: Canlı ticari fırsat paketi.
+- `StatCard`: Küçük istatistik kartları.
+- `AppShell`: Panel layout yapısı.
 
-## 12. Yenileme Algoritması
+Bir bileşen hem veri çekme, hem form yönetme, hem grafik çizme, hem API çağırma işlerini aynı anda yapmamalıdır. Bu prensip clean code açısından önemlidir.
 
-Kullanıcı haberleri veya ürün sonuçlarını yenilediğinde sistemin aynı sonuçları tekrar göstermemesi gerekir. Bunun için iki taraflı filtreleme yapılır.
+## 21. Grafikler ve Veri Görselleştirme
 
-Client tarafı mevcut ekranda görünen haber ve ürün sonuçlarının URL ve başlıklarını API’ye gönderir. Server tarafı ise hem Supabase’den gelen eski kayıtları hem client’tan gelen dışlama listesini kullanır.
+Sarowth’ta iki önemli grafik vardır: harcama donut grafiği ve risk gauge grafiği.
 
-Tekrarlı sonuç eleme yöntemleri:
+Donut grafik kategori yüzdelerini SVG stroke segmentleriyle gösterir. SVG kullanmak çizim kontrolünü artırır. Küçük yüzdeler gerçek oranına yakın ince dilim olarak gösterilebilir.
 
-- Normalize edilmiş URL karşılaştırması.
-- Query parametrelerini yok sayma.
-- Başlık normalizasyonu.
-- Başlık token benzerliği.
-- Aynı haber farklı URL ile gelirse başlık benzerliğine göre eleme.
+Risk gauge harcama yükü, likidite yükü ve kategori baskısından üretilen 0-100 risk skorunu gösterir. Yeşil güvenli, sarı dikkat, kırmızı riskli alanı temsil eder.
 
-Bu yapı yenileme deneyimini daha doğru hale getirir. Eğer farklı yeni sonuç bulunamazsa sistem aynı sonuçları tekrar göstermek yerine bunu kullanıcıya açıkça söyler.
+## 22. Güvenlik
 
-## 13. Risk Skoru ve Gauge
+Güvenlikte temel prensip gizli anahtarların client’a çıkmamasıdır. Supabase service role key, Gemini key, SerpAPI key ve agent secret değerleri sadece server tarafında kullanılmalıdır.
 
-Risk skoru sadece gider / gelir oranıyla hesaplanmaz. Kompozit bir skor kullanılır.
+Agent endpointleri secret kontrolüyle korunur. Kullanıcı verileri session doğrulamasıyla ayrılır. Form verileri server tarafında tekrar doğrulanır. Bu yaklaşım client manipülasyonuna karşı koruma sağlar.
 
-Skor bileşenleri:
+## 23. Performans
 
-- Harcama yükü.
-- Likidite yükü.
-- En büyük gider kategorisinin baskısı.
+Performans için şu yaklaşımlar kullanılır:
 
-Bu bileşenler 0-100 arasında bir risk skoru üretir. Arayüzde yarım daire gauge ile gösterilir. Skor düşükse yeşil, orta seviyedeyse sarı, yüksekse kırmızı risk bandı kullanılır.
+- Gereksiz Gemini çağrısı yapılmaz.
+- Dış API çağrıları paralel yapılır.
+- Sonuç sayıları sınırlanır.
+- Agent sonuçları veritabanına kaydedilir.
+- Dashboard tek response ile güncellenir.
+- Yenilemede önceki sonuçlar dışlanır.
 
-## 14. Harcama Dağılımı Donut Grafiği
+Performans sadece hızlı çalışmak değildir. Aynı zamanda API kotasını, kullanıcı bekleme süresini ve gereksiz veri tekrarını azaltmaktır.
 
-Harcama donut grafiği kategori yüzdelerini gösterir. Grafik SVG stroke segmentleriyle çizilir. Bu yaklaşım CSS conic-gradient kullanımına göre daha kontrollüdür. Küçük oranlar, örneğin %1 seviyesindeki kategoriler, gerçek oranına yakın şekilde ince dilim olarak gösterilir.
+## 24. Deployment
 
-## 15. Performans Yaklaşımı
+Deployment için Vercel kullanılabilir. Ortam değişkenleri Vercel dashboard üzerinden tanımlanır. Cron job ile intelligence agent belirli aralıklarla çalıştırılır.
 
-Sarowth’ta performans için şu yaklaşımlar kullanılır:
+Gerekli ortam değişkenleri:
 
-- Server component ile ilk veri yükleme.
-- Chat dışındaki işlemlerde Gemini çağrısı yapılmaması.
-- Yerel karar motoruyla Gemini kullanımını azaltma.
-- SerpAPI sonuçlarını Supabase’e persist etme.
-- Yenilemede önceki sonuçları dışlayarak gereksiz tekrarları azaltma.
-- Promise tabanlı paralel API çağrıları.
-- Sınırlı result set kullanımı.
-- Dashboard verisini tek response payload içinde güncelleme.
+```env
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+RESEND_API_KEY=
+MAIL_FROM=
+EMAIL_CODE_SECRET=
+GEMINI_API_KEY=
+GEMINI_MODEL=
+SERPAPI_API_KEY=
+INTELLIGENCE_AGENT_SECRET=
+NEWS_AGENT_SECRET=
+MARKET_AGENT_SECRET=
+```
 
-## 16. Güvenlik Yaklaşımı
+## 25. Sıfırdan Geliştirme Planı
 
-Güvenlik tarafında temel prensipler şunlardır:
+Bu projeyi sıfırdan geliştirmek için şu sırayı izlemek en sağlıklı yoldur:
 
-- Supabase service role key yalnızca server tarafında kullanılır.
-- Client tarafında sadece public anon key bulunur.
-- Agent endpointleri secret veya cron doğrulamasıyla korunur.
-- Email doğrulama kodu hash mantığıyla saklanır.
-- Kullanıcı oturumu server tarafında doğrulanır.
-- Finans ve yatırım cevapları karar desteği olarak sınırlandırılır.
-
-## 17. Kod Organizasyonu
-
-Proje dizinleri:
-
-- `app/`: Next.js route, page ve API yapıları.
-- `components/`: Reusable React bileşenleri.
-- `lib/`: Supabase, auth, mail ve agent yardımcıları.
-- `supabase/`: Veritabanı şeması.
-- `docs/`: Teknik dokümantasyon.
-- `public/`: Statik dosyalar, ikonlar ve manifest.
-
-Kodda temel prensip, iş mantığını mümkün olduğunca küçük fonksiyonlara ayırmaktır. Örneğin haber aramasında normalize, konu çıkarımı, fuzzy skor, URL normalize ve yenileme filtreleri ayrı fonksiyonlardır. Bu hem test edilebilirliği hem okunabilirliği artırır.
-
-## 18. Sıfırdan Geliştirme Rehberi
-
-Bu projeyi sıfırdan geliştirmek için önerilen sıra şöyledir:
-
-1. Next.js projesi oluştur.
-2. TypeScript ve Tailwind CSS kurulumunu tamamla.
-3. Supabase projesi aç ve auth ayarlarını yapılandır.
+1. Next.js ve TypeScript projesi oluştur.
+2. Tailwind CSS kurulumunu yap.
+3. Supabase projesi aç.
 4. Veritabanı tablolarını oluştur.
-5. Email doğrulama için Resend entegrasyonu kur.
-6. Bütçe giriş ekranını geliştir.
-7. Bütçe özet algoritmasını yaz.
-8. Satın alma karar motorunu geliştir.
-9. Chat API route oluştur.
-10. Gemini adapter ekle.
-11. SerpAPI ürün ve haber aramalarını ekle.
-12. Fuzzy filtreleme ve skorlamayı geliştir.
-13. Agent sonuçlarını veritabanına yaz.
-14. Ana panelde grafik ve agent kartlarını göster.
-15. Yenileme ve tekrar önleme mantığını ekle.
-16. Vercel deployment ve cron ayarlarını yap.
+5. Email doğrulama akışını geliştir.
+6. Auth session yönetimini kur.
+7. Bütçe kayıt formunu yaz.
+8. Bütçe özet fonksiyonunu geliştir.
+9. Satın alma karar motorunu yaz.
+10. Chat UI bileşenini oluştur.
+11. `/api/assistant` endpointini yaz.
+12. Gemini adapter ekle.
+13. SerpAPI haber aramasını ekle.
+14. SerpAPI ürün aramasını ekle.
+15. Fuzzy eşleşme algoritmasını geliştir.
+16. Agent sonuçlarını Supabase’e yaz.
+17. Dashboard panellerini bağla.
+18. Yenileme ve tekrar önleme mantığını ekle.
+19. Grafik bileşenlerini geliştir.
+20. Vercel deployment yap.
 
-Bu sıranın avantajı, önce çekirdek bütçe ve karar motorunun kurulmasıdır. Dış API’ler daha sonra eklenir. Böylece sistem API kotası olmasa bile temel karar desteğini sürdürebilir.
+Bu sırayı takip etmek önemlidir. Önce çekirdek ürün ve karar motoru kurulmalıdır. Dış API’ler daha sonra eklenmelidir. Böylece API kotası veya dış servis hatası olsa bile sistem temel işlevini korur.
 
-## 19. Önemli Dosyalar
+## 26. Kod Okuma Rehberi
 
-- `app/api/assistant/route.ts`: Chat, karar motoru, SerpAPI, Gemini ve dashboard payload merkezi.
-- `components/AssistantChat.tsx`: Chat UI, loading animasyonu ve yenileme kontrolleri.
-- `components/AgentIntelligenceWorkspace.tsx`: Agent verilerinin panelde gösterimi.
-- `components/BudgetEntryForm.tsx`: Kategori bazlı bütçe girişi.
-- `app/page.tsx`: Girişli ana ekran, grafikler ve karar panelleri.
-- `app/workspace/actions.ts`: Server actions ve form kayıtları.
-- `supabase/schema.sql`: Veritabanı şeması.
-- `lib/agents/security.ts`: Agent endpoint güvenliği.
+Projeyi anlamak için şu sırayla dosyaları okumak önerilir:
 
-## 20. Son Yapılan İyileştirmeler
+1. `README.md`
+2. `supabase/schema.sql`
+3. `app/workspace/actions.ts`
+4. `components/BudgetEntryForm.tsx`
+5. `app/page.tsx`
+6. `components/AgentIntelligenceWorkspace.tsx`
+7. `components/AssistantChat.tsx`
+8. `app/api/assistant/route.ts`
+9. `app/api/agents/intelligence/route.ts`
+10. `lib/agents/security.ts`
 
-Son geliştirme turunda şu iyileştirmeler yapılmıştır:
+Bu sırayla okumak, önce veri modelini, sonra kullanıcı arayüzünü, sonra karar ve agent mantığını anlamayı sağlar.
 
-- Bütçe kategori seçimi gelir, gider ve birikim türlerine ayrıldı.
-- Donut grafik SVG tabanlı hale getirildi.
-- Risk gauge daha geniş ve okunabilir tasarlandı.
-- Ürün araması marka/model doğruluğu için fuzzy skorlamayla güçlendirildi.
-- Haber araması ana konu çıkarımıyla genel hale getirildi.
-- Global ürün arama modu eklendi.
-- Konuma göre para birimi gösterimi ve kur dönüşümü eklendi.
-- Chat loading animasyonu eklendi.
-- Haber ve ürün yenileme butonları eklendi.
-- Yenilemede aynı sonuçların tekrar gösterilmemesi için URL ve başlık dışlama eklendi.
-- Kod içinde gereksiz yorumlar temizlendi.
-- Chat UI tarafında tekrar eden regex ve dashboard exclusion mantığı sadeleştirildi.
+## 27. Geliştirme Disiplini
 
-## 21. Profesyonel Değerlendirme
+Profesyonel geliştirme için şu kurallar izlenmelidir:
 
-Sarowth’un güçlü tarafı, yapay zeka cevabını tek başına ürünün merkezine koymamasıdır. Sistem önce güvenilir, deterministik ve izlenebilir karar katmanını çalıştırır. Dış API’lerden gelen sinyaller filtrelenir ve skorlanır. Dil modeli ise kararın anlatım katmanı olarak konumlanır. Bu yaklaşım daha düşük maliyet, daha düşük halüsinasyon riski ve daha sürdürülebilir ürün mimarisi sağlar.
+- Her fonksiyon tek sorumluluk taşımalıdır.
+- Client doğrulaması server doğrulamasının yerine geçmemelidir.
+- API key client tarafına çıkmamalıdır.
+- Büyük dosyalar zamanla modüllere ayrılmalıdır.
+- Dış API sonuçları filtrelenmeden kullanıcıya gösterilmemelidir.
+- Finansal kararlar sadece dil modeline bırakılmamalıdır.
+- Build her önemli değişiklikten sonra çalıştırılmalıdır.
+- Veritabanı şeması dokümante edilmelidir.
 
-Proje MVP olarak manuel bütçe girişiyle başlar. Bu bilinçli bir tercihtir. Banka entegrasyonu daha karmaşık regülasyon, güvenlik ve veri erişimi gerektirir. Manuel giriş, hackathon ve erken ürün doğrulama aşamasında daha hızlı, güvenli ve kontrol edilebilir bir yoldur.
+## 28. Gelecek Geliştirmeler
 
-## 22. Gelecek Geliştirmeler
+Proje gelecekte şu alanlarda genişletilebilir:
 
-- Banka entegrasyonu için açık bankacılık sağlayıcıları.
-- Daha gelişmiş haber kaynak sınıflandırması.
-- Agent sonuçları için kullanıcı geri bildirim skoru.
-- Ürün fiyat geçmişi takibi.
-- Daha gelişmiş döviz dönüşüm cache katmanı.
+- Banka entegrasyonu.
+- Daha gelişmiş fiyat geçmişi takibi.
+- Kullanıcı geri bildirimine göre agent skor iyileştirme.
+- Haber kaynak güvenilirliği skoru.
+- Daha kapsamlı test altyapısı.
+- Agent observability paneli.
+- Döviz kuru cache sistemi.
 - Harcama anomalisi algılama.
-- Kullanıcı bazlı risk profili öğrenimi.
-- Test kapsamının artırılması.
-- Agent sonuçları için observability paneli.
+- Mobil uygulama.
 
-## 23. Sonuç
+## Sonuç
 
-Sarowth, kişisel finans yönetimi, canlı veri agentları ve kontrollü yapay zeka cevabını tek mimaride birleştirir. Kullanıcının gerçek bütçesini merkeze alır, haber ve ürün sinyallerini bu bütçeyle ilişkilendirir ve karar desteğini anlaşılır bir arayüzle sunar. Bu yaklaşım, sadece sohbet eden bir asistan değil, kullanıcıya gerçek zamanlı finansal bağlam sağlayan uygulanabilir bir karar sistemi oluşturur.
+Sarowth, kişisel bütçe yönetimi, canlı veri agentları ve kontrollü yapay zeka anlatımını tek sistemde birleştirir. Projenin temel mühendislik değeri, karar mekanizmasını tamamen yapay zekaya bırakmaması ve dış verileri filtreleyerek kullanmasıdır. Bu el kitabı takip edilerek aynı mimari sıfırdan kurulabilir, geliştirici hem modern web teknolojilerini hem de karar destek sistemi tasarlamayı öğrenebilir.

@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sarowth Geliştirici El Kitabı</title>
+  <style>
+    @page { size: A4; margin: 18mm 16mm; }
+    body { font-family: "Segoe UI", Arial, sans-serif; color: #111827; line-height: 1.62; font-size: 11.5pt; }
+    h1 { font-size: 30pt; line-height: 1.1; margin: 0 0 8mm; color: #064e3b; }
+    h2 { font-size: 19pt; margin: 11mm 0 4mm; color: #065f46; page-break-after: avoid; }
+    h3 { font-size: 14pt; margin: 7mm 0 2mm; color: #0f172a; page-break-after: avoid; }
+    p { margin: 0 0 3.2mm; }
+    ul, ol { margin-top: 2mm; margin-bottom: 4mm; padding-left: 7mm; }
+    li { margin-bottom: 1.6mm; }
+    code { font-family: Consolas, monospace; background: #ecfdf5; color: #065f46; padding: 1px 4px; border-radius: 4px; }
+    pre { background: #0f172a; color: #e2e8f0; padding: 4mm; border-radius: 8px; white-space: pre-wrap; font-size: 9.5pt; }
+    .cover { min-height: 235mm; display: flex; flex-direction: column; justify-content: center; border: 1px solid #d1fae5; padding: 16mm; background: linear-gradient(135deg, #ecfdf5, #eff6ff); }
+    .subtitle { font-size: 15pt; color: #475569; max-width: 150mm; }
+    .meta { margin-top: 10mm; color: #64748b; }
+    .toc { page-break-before: always; }
+    .chapter { page-break-before: auto; }
+    .note { border-left: 4px solid #10b981; background: #ecfdf5; padding: 3mm 4mm; margin: 4mm 0; }
+    .warning { border-left: 4px solid #f59e0b; background: #fffbeb; padding: 3mm 4mm; margin: 4mm 0; }
+    table { border-collapse: collapse; width: 100%; margin: 4mm 0; font-size: 10.5pt; }
+    th, td { border: 1px solid #cbd5e1; padding: 2.5mm; text-align: left; vertical-align: top; }
+    th { background: #f1f5f9; }
+  </style>
+</head>
+<body>
+  <section class="cover">
+    <h1>Sarowth Geliştirici El Kitabı</h1>
+    <p class="subtitle">Kişisel bütçe, canlı haber ve ürün agentlarıyla çalışan Türkçe karar destek sistemini sıfırdan geliştirmek için kapsamlı teknik rehber.</p>
+    <p class="meta">Bu belge, projeyi yapay zeka kullanmadan yeniden geliştirmek isteyen bir geliştiricinin mimariyi, algoritmaları, teknolojileri ve mühendislik kararlarını öğrenmesi için hazırlanmıştır.</p>
+  </section>
+
+  <section class="toc">
+    <h2>İçindekiler</h2>
+    <ol>
+      <li>Projenin amacı ve ürün mantığı</li>
+      <li>Kullanılan teknolojiler</li>
+      <li>Sistem mimarisi</li>
+      <li>Veritabanı ve auth tasarımı</li>
+      <li>Bütçe modülü ve karar motoru</li>
+      <li>Chat asistanı ve Gemini entegrasyonu</li>
+      <li>Agent mimarisi</li>
+      <li>Haber, ürün ve fuzzy arama algoritmaları</li>
+      <li>Yenileme, tekrar önleme ve para birimi dönüşümü</li>
+      <li>Sıfırdan geliştirme planı</li>
+    </ol>
+  </section>
+
+  <section class="chapter">
+    <h2>1. Projenin Amacı</h2>
+    <p>Sarowth, kişisel bütçe yönetimini canlı haber, ürün trendi ve tedarik sinyalleriyle birleştiren web tabanlı bir karar destek sistemidir. Kullanıcı gelir, gider ve birikim kayıtlarını girer. Sistem bu kayıtları kullanarak serbest bütçe, risk bandı ve güvenli test bütçesi hesaplar.</p>
+    <p>Bu sistemin farkı, yapay zeka cevabını merkeze koymak yerine deterministik karar motorunu merkeze almasıdır. Büyük dil modeli yalnızca kararın anlatım katmanı olarak kullanılır.</p>
+    <div class="note">Temel prensip: Finansal karar önce hesaplanır, sonra anlatılır. Model karar vermez; karar motorunun sonucunu anlaşılır hale getirir.</div>
+  </section>
+
+  <section class="chapter">
+    <h2>2. Kullanılan Teknolojiler</h2>
+    <table>
+      <tr><th>Teknoloji</th><th>Görevi</th></tr>
+      <tr><td>TypeScript</td><td>Tip güvenliği sağlar, veri şekillerini açık hale getirir.</td></tr>
+      <tr><td>React</td><td>Arayüzü bileşenlere ayırır.</td></tr>
+      <tr><td>Next.js</td><td>Sayfalar, API route'lar ve server rendering altyapısını sağlar.</td></tr>
+      <tr><td>Tailwind CSS</td><td>Responsive ve hızlı arayüz geliştirme sağlar.</td></tr>
+      <tr><td>Supabase</td><td>Auth, PostgreSQL ve server-side veri erişimi sağlar.</td></tr>
+      <tr><td>Resend</td><td>Email doğrulama kodlarını gönderir.</td></tr>
+      <tr><td>SerpAPI</td><td>Google News ve Google Shopping verilerini getirir.</td></tr>
+      <tr><td>Gemini API</td><td>Yerel karar sonucunu doğal Türkçe cevaba dönüştürür.</td></tr>
+      <tr><td>Frankfurter API</td><td>Döviz kuru dönüşümü yapar.</td></tr>
+      <tr><td>Vercel</td><td>Deployment, environment variable ve cron altyapısı sağlar.</td></tr>
+    </table>
+  </section>
+
+  <section class="chapter">
+    <h2>3. Sistem Mimarisi</h2>
+    <p>Sarowth üç ana katmandan oluşur: arayüz katmanı, uygulama/karar katmanı ve veri katmanı.</p>
+    <ul>
+      <li>Arayüz katmanı: React bileşenleri, formlar, grafikler, chat ve panel ekranları.</li>
+      <li>Uygulama katmanı: API route'lar, server action'lar, karar motoru, agent endpointleri.</li>
+      <li>Veri katmanı: Supabase PostgreSQL tabloları ve auth sessionları.</li>
+    </ul>
+    <h3>Chat veri akışı</h3>
+    <ol>
+      <li>Kullanıcı mesaj gönderir.</li>
+      <li><code>/api/assistant</code> endpointi mesajı alır.</li>
+      <li>Supabase session doğrulanır.</li>
+      <li>Bütçe ve agent verileri çekilir.</li>
+      <li>Komut ayrıştırılır.</li>
+      <li>Gerekirse SerpAPI veya kur API'si çağrılır.</li>
+      <li>Yerel karar motoru sonucu üretir.</li>
+      <li>Gemini anlatım katmanı olarak çağrılır.</li>
+      <li>Cevap ve dashboard verisi client'a döner.</li>
+    </ol>
+  </section>
+
+  <section class="chapter">
+    <h2>4. Veritabanı Tasarımı</h2>
+    <p>Veritabanı tasarımında veriler ayrı sorumluluklara göre tablolara bölünür. Kullanıcı profili, bütçe kayıtları, chat geçmişi, haberler ve tedarik linkleri aynı tabloda tutulmaz.</p>
+    <table>
+      <tr><th>Tablo</th><th>Amaç</th></tr>
+      <tr><td>profiles</td><td>Kullanıcı profil, gelir, tasarruf hedefi ve risk tercihi.</td></tr>
+      <tr><td>budget_entries</td><td>Gelir, gider ve birikim kayıtları.</td></tr>
+      <tr><td>assistant_messages</td><td>Chat geçmişi.</td></tr>
+      <tr><td>agent_watch_topics</td><td>Takip edilen ürün ve haber konuları.</td></tr>
+      <tr><td>market_product_signals</td><td>Ürün trend sinyalleri.</td></tr>
+      <tr><td>finance_news_items</td><td>Haber sonuçları.</td></tr>
+      <tr><td>product_supplier_links</td><td>Ürün ve tedarik linkleri.</td></tr>
+      <tr><td>agent_runs</td><td>Agent çalışma logları.</td></tr>
+    </table>
+  </section>
+
+  <section class="chapter">
+    <h2>5. Kimlik Doğrulama</h2>
+    <p>Proje email ve 6 haneli doğrulama kodu kullanır. Kullanıcı email adresini girer, sistem kod üretir, kod hashlenir, Resend ile gönderilir ve kullanıcı kodu doğruladığında Supabase session oluşturulur.</p>
+    <div class="warning">Client tarafında yapılan doğrulama güvenlik için yeterli değildir. Kritik kontroller her zaman server tarafında da yapılmalıdır.</div>
+  </section>
+
+  <section class="chapter">
+    <h2>6. Bütçe Modülü</h2>
+    <p>Bütçe modülü karar motorunun temelidir. Kullanıcı kayıt türünü seçer: gelir, gider veya birikim. Her tür için ayrı kategori listesi gösterilir. Bu, verinin temiz kalmasını sağlar.</p>
+    <p>Server action kayıt alırken kategori ile kayıt türünün uyumlu olup olmadığını kontrol eder. Böylece kullanıcı doğrudan request gönderse bile hatalı veri yazılamaz.</p>
+  </section>
+
+  <section class="chapter">
+    <h2>7. Karar Motoru</h2>
+    <p>Satın alma karar motoru kullanıcının gelirini, giderini, birikimini ve serbest bütçesini hesaplar. Kullanıcı bir tutar verdiğinde sistem bu tutarın bütçeyi ne kadar zorladığını ölçer.</p>
+    <ul>
+      <li><code>ALINABİLİR</code>: Satın alma sonrası güvenli alan korunur.</li>
+      <li><code>BEKLE</code>: Satın alma mümkün görünür ama bütçeyi zorlar.</li>
+      <li><code>ALMA</code>: Satın alma güvenli alanın dışına çıkarır.</li>
+    </ul>
+    <p>Bu karar motoru deterministiktir. Aynı veriyle aynı sonucu üretir. Finansal karar desteği için bu tutarlılık önemlidir.</p>
+  </section>
+
+  <section class="chapter">
+    <h2>8. Agent Mimarisi</h2>
+    <p>Agent, belirli bir hedef için veri toplayan, filtreleyen, skorlayan ve sisteme yazan görev birimidir. Sarowth'ta agentlar sadece chat cevabı üretmez; haber, ürün ve tedarik verisini panele bağlar.</p>
+    <ul>
+      <li>Haber agentı: Global haberleri arar.</li>
+      <li>Ürün agentı: Yerel veya global ürün sonuçlarını arar.</li>
+      <li>Intelligence agent: Takip edilen konuları periyodik işler.</li>
+      <li>Market agent: Trend ürün sinyallerini günceller.</li>
+    </ul>
+  </section>
+
+  <section class="chapter">
+    <h2>9. Haber Arama Algoritması</h2>
+    <p>Haber aramasında kullanıcının yazdığı cümleden ana konu çıkarılır. Örneğin <code>tesla hissesi son durum</code> ifadesinde ana konu <code>tesla</code> olur. <code>hisse</code>, <code>son durum</code>, <code>haber</code> gibi kelimeler arama niyetidir, ana konu değildir.</p>
+    <ol>
+      <li>Metin normalize edilir.</li>
+      <li>Gereksiz haber kelimeleri çıkarılır.</li>
+      <li>Ana konu belirlenir.</li>
+      <li>Global sorgu varyasyonları üretilir.</li>
+      <li>SerpAPI Google News çağrılır.</li>
+      <li>Sonuçlar fuzzy eşleşme ile filtrelenir.</li>
+      <li>Skora göre sıralanır.</li>
+    </ol>
+  </section>
+
+  <section class="chapter">
+    <h2>10. Ürün Arama Algoritması</h2>
+    <p>Ürün aramasında genel kategori sonucu yeterli değildir. Kullanıcı marka ve model girdiyse sonuç başlığında bu tokenların anlamlı şekilde eşleşmesi gerekir.</p>
+    <p>Örneğin <code>kaabo wolf warrior x scooter</code> araması sadece scooter sonuçlarıyla doldurulmamalıdır. Kaabo, Wolf, Warrior ve X bilgileri ürünün kimliğini oluşturur.</p>
+    <p>Kullanıcı ürün adının sonuna <code>global</code> eklerse global pazar aranır. Aksi halde kullanıcının konumuna göre yerel pazar aranır.</p>
+  </section>
+
+  <section class="chapter">
+    <h2>11. Fuzzy Eşleşme</h2>
+    <p>Fuzzy eşleşme, küçük yazım hatalarına tolerans tanır. Metin normalize edilir, tokenlara ayrılır ve sonuç başlığıyla karşılaştırılır. Edit distance kullanılarak benzer kelimeler kabul edilebilir.</p>
+    <p>Bu teknik hem eksik sonuç sorununu hem de alakasız sonuç sorununu azaltır. Ancak eşik değerleri dikkatli seçilmelidir. Çok gevşek eşik alakasız sonuç getirir; çok sıkı eşik doğru sonuçları kaçırır.</p>
+  </section>
+
+  <section class="chapter">
+    <h2>12. Yenileme ve Tekrar Önleme</h2>
+    <p>Kullanıcı haberleri veya ürünleri yenilediğinde aynı sonuçların tekrar gösterilmemesi gerekir. Bu yüzden client, ekranda görünen başlık ve URL listesini server'a gönderir. Server bu sonuçları dışlar.</p>
+    <p>URL'ler normalize edilir. Başlıklar da normalize edilir ve token benzerliğiyle karşılaştırılır. Aynı haber farklı URL ile gelse bile başlık benzerliğinden elenmeye çalışılır.</p>
+  </section>
+
+  <section class="chapter">
+    <h2>13. Para Birimi ve Konum</h2>
+    <p>Ürün araması kullanıcının konumuna göre yerel sonuç getirebilir. Konum bilgisi Vercel veya Cloudflare headerlarından okunur. Eğer global arama seçilmişse global pazar aranır ama fiyat kullanıcının yerel para birimine çevrilmeye çalışılır.</p>
+    <p>Kur dönüşümü başarısız olursa sistem orijinal fiyatı korur. Bu, kullanıcıya yanlış dönüşüm göstermekten daha güvenlidir.</p>
+  </section>
+
+  <section class="chapter">
+    <h2>14. Sıfırdan Geliştirme Planı</h2>
+    <ol>
+      <li>Next.js TypeScript projesi oluştur.</li>
+      <li>Tailwind CSS kur.</li>
+      <li>Supabase projesi aç.</li>
+      <li>Veritabanı tablolarını oluştur.</li>
+      <li>Email doğrulama akışını yaz.</li>
+      <li>Bütçe formunu geliştir.</li>
+      <li>Bütçe özet fonksiyonunu yaz.</li>
+      <li>Satın alma karar motorunu yaz.</li>
+      <li>Chat UI oluştur.</li>
+      <li>Assistant API route yaz.</li>
+      <li>SerpAPI haber araması ekle.</li>
+      <li>SerpAPI ürün araması ekle.</li>
+      <li>Fuzzy eşleşme algoritmasını yaz.</li>
+      <li>Gemini anlatım katmanını ekle.</li>
+      <li>Agent sonuçlarını Supabase'e kaydet.</li>
+      <li>Dashboard panellerini bağla.</li>
+      <li>Yenileme ve tekrar önleme mantığını ekle.</li>
+      <li>Vercel deployment yap.</li>
+    </ol>
+  </section>
+
+  <section class="chapter">
+    <h2>15. Kod Okuma Sırası</h2>
+    <ol>
+      <li><code>README.md</code></li>
+      <li><code>supabase/schema.sql</code></li>
+      <li><code>app/workspace/actions.ts</code></li>
+      <li><code>components/BudgetEntryForm.tsx</code></li>
+      <li><code>app/page.tsx</code></li>
+      <li><code>components/AssistantChat.tsx</code></li>
+      <li><code>components/AgentIntelligenceWorkspace.tsx</code></li>
+      <li><code>app/api/assistant/route.ts</code></li>
+      <li><code>app/api/agents/intelligence/route.ts</code></li>
+      <li><code>lib/agents/security.ts</code></li>
+    </ol>
+  </section>
+
+  <section class="chapter">
+    <h2>16. Profesyonel Geliştirme Kuralları</h2>
+    <ul>
+      <li>Her fonksiyon tek sorumluluk taşımalıdır.</li>
+      <li>Client doğrulaması server doğrulamasının yerine geçmemelidir.</li>
+      <li>API key asla client tarafına çıkmamalıdır.</li>
+      <li>Dış API sonuçları filtrelenmeden kullanıcıya gösterilmemelidir.</li>
+      <li>Finansal kararlar yalnızca LLM'e bırakılmamalıdır.</li>
+      <li>Her önemli değişiklikten sonra build alınmalıdır.</li>
+      <li>Veritabanı şeması ve ortam değişkenleri dokümante edilmelidir.</li>
+    </ul>
+  </section>
+
+  <section class="chapter">
+    <h2>Sonuç</h2>
+    <p>Sarowth, kişisel finans verisini canlı haber ve ürün agentlarıyla birleştiren, kontrollü yapay zeka anlatım katmanına sahip bir karar destek sistemidir. Bu el kitabı takip edilerek proje sıfırdan geliştirilebilir ve geliştirici modern web mimarisi, veri modelleme, API entegrasyonu, agent mantığı, fuzzy arama ve güvenli karar motoru tasarlamayı öğrenebilir.</p>
+  </section>
+</body>
+</html>
