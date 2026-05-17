@@ -76,6 +76,19 @@ const queryCorrections: Record<string, string> = {
   kaboo: "kaabo",
 };
 
+const countrySearchSettings: Record<string, { gl: string; hl: string; currency: string; buyTerms: string; location?: string }> = {
+  TR: { gl: "tr", hl: "tr", currency: "TRY", buyTerms: "satın al fiyat", location: "Turkey" },
+  US: { gl: "us", hl: "en", currency: "USD", buyTerms: "buy price", location: "United States" },
+  GB: { gl: "uk", hl: "en", currency: "GBP", buyTerms: "buy price", location: "United Kingdom" },
+  DE: { gl: "de", hl: "de", currency: "EUR", buyTerms: "kaufen preis", location: "Germany" },
+  FR: { gl: "fr", hl: "fr", currency: "EUR", buyTerms: "acheter prix", location: "France" },
+  NL: { gl: "nl", hl: "nl", currency: "EUR", buyTerms: "kopen prijs", location: "Netherlands" },
+  ES: { gl: "es", hl: "es", currency: "EUR", buyTerms: "comprar precio", location: "Spain" },
+  IT: { gl: "it", hl: "it", currency: "EUR", buyTerms: "comprare prezzo", location: "Italy" },
+  CA: { gl: "ca", hl: "en", currency: "CAD", buyTerms: "buy price", location: "Canada" },
+  AU: { gl: "au", hl: "en", currency: "AUD", buyTerms: "buy price", location: "Australia" },
+};
+
 interface GeminiResponse {
   candidates?: Array<{
     content?: {
@@ -205,7 +218,7 @@ function buildTrackingReply(query: string, signals: MarketSignal[], suppliers: S
   const signalText = matched.length > 0 ? matched.map((item) => `- ${item.product_name}: ${item.signal} (${item.score}/100)`).join("\n") : "- Trend skoru için yeterli sinyal yok; tedarik kartları üzerinden kontrol et.";
   const supplierText = supplierItems.length > 0 ? `\n\nTedarik kartları hazır:\n${supplierItems.map((item, index) => `${index + 1}. ${item.title} (${item.source}${item.price_text ? `, ${item.price_text}` : ""})`).join("\n")}\n\nLinklere aşağıdaki tedarik kartlarından tıklayabilirsin.` : "\n\nTedarik linkleri: Bu ürün için canlı tedarik sonucu bulunamadı.";
 
-  return `Ürün paketi hazır: ${query}\n\nTrend sinyali:\n${signalText}${supplierText}\n\nAjan notu: Sonuçlar marka/model kelime eşleşmesine göre filtrelendi. Stok almadan önce fiyat, kargo, iade ve düşük bütçeli talep testini kontrol et.`;
+  return `Ürün paketi hazır: ${query}\n\nTrend sinyali:\n${signalText}${supplierText}\n\nAjan notu: Ürün ve fiyat sonuçları konumuna göre bölgesel mağaza/para birimiyle, haber sinyalleri ise global kaynaklardan taranır. Sonuçlar marka/model kelime eşleşmesine göre filtrelendi. Stok almadan önce fiyat, kargo, iade ve düşük bütçeli talep testini kontrol et.`;
 }
 
 function buildInvestmentReply(summary: ReturnType<typeof buildBudgetSummary>) {
@@ -285,6 +298,23 @@ function getLiveScore(index: number, item: SerpShoppingResult) {
   const base = Math.max(58, 92 - index * 8);
   const ratingBonus = item.rating ? Math.min(5, Math.round(item.rating)) : 0;
   return Math.min(100, base + ratingBonus);
+}
+
+function getSearchRegion(request: Request) {
+  const countryHeader = request.headers.get("x-vercel-ip-country") ?? request.headers.get("cf-ipcountry") ?? "";
+  const languageHeader = request.headers.get("accept-language") ?? "";
+  const languageCountry = languageHeader.match(/-([A-Z]{2})\b/i)?.[1]?.toUpperCase();
+  const country = (countryHeader || languageCountry || "TR").toUpperCase();
+
+  return countrySearchSettings[country] ?? countrySearchSettings.TR;
+}
+
+function formatRegionalPrice(value: number, currency: string) {
+  try {
+    return new Intl.NumberFormat("tr-TR", { style: "currency", currency, maximumFractionDigits: 0 }).format(value);
+  } catch {
+    return `${value.toLocaleString("tr-TR")} ${currency}`;
+  }
 }
 
 function normalizeSearchText(value: string) {
@@ -389,18 +419,22 @@ async function fetchSerpApi<T>(params: Record<string, string>) {
   }
 }
 
-async function fetchLiveProductBundle(productName: string) {
+async function fetchLiveProductBundle(productName: string, region: ReturnType<typeof getSearchRegion>) {
   const normalizedProductName = normalizeQuery(productName);
   const exactQuery = `"${normalizedProductName}"`;
+  const regionalParams: Record<string, string> = { gl: region.gl, hl: region.hl };
+  if (region.location) regionalParams.location = region.location;
   const [shoppingResponses, newsResponses] = await Promise.all([
     fetchFirstSerpResults<SerpShoppingResponse>([
-      { engine: "google_shopping", q: exactQuery, gl: "tr", hl: "tr" },
-      { engine: "google_shopping", q: normalizedProductName, gl: "tr", hl: "tr" },
-      { engine: "google_shopping", q: `${normalizedProductName} satın al fiyat`, gl: "tr", hl: "tr" },
-      { engine: "google_shopping", q: `${normalizedProductName} buy price`, gl: "us", hl: "en" },
+      { engine: "google_shopping", q: exactQuery, ...regionalParams },
+      { engine: "google_shopping", q: normalizedProductName, ...regionalParams },
+      { engine: "google_shopping", q: `${normalizedProductName} ${region.buyTerms}`, ...regionalParams },
+      { engine: "google_shopping", q: `${normalizedProductName} buy price`, gl: "us", hl: "en", location: "United States" },
     ]),
     fetchFirstSerpResults<SerpNewsResponse>([
-      { engine: "google_news", q: exactQuery, gl: "tr", hl: "tr" },
+      { engine: "google_news", q: exactQuery, gl: "us", hl: "en" },
+      { engine: "google_news", q: `${normalizedProductName} news review`, gl: "us", hl: "en" },
+      { engine: "google_news", q: `${normalizedProductName} global market`, gl: "gb", hl: "en" },
       { engine: "google_news", q: `${normalizedProductName} haber inceleme`, gl: "tr", hl: "tr" },
       { engine: "google_news", q: `${normalizedProductName} review news`, gl: "us", hl: "en" },
     ]),
@@ -425,7 +459,7 @@ async function fetchLiveProductBundle(productName: string) {
     title: item.title as string,
     url: (item.link ?? item.product_link) as string,
     source: item.source ?? "Google Shopping",
-    price_text: item.price ?? (item.extracted_price ? `₺${item.extracted_price}` : null),
+    price_text: item.price ?? (item.extracted_price ? formatRegionalPrice(item.extracted_price, region.currency) : null),
     score: Math.max(getLiveScore(index, item), scoreSearchMatch(normalizedProductName, `${item.title} ${item.source ?? ""}`)),
   }));
   const signals: MarketSignal[] = shoppingResults.length > 0 ? [{
@@ -448,9 +482,12 @@ async function fetchLiveProductBundle(productName: string) {
 async function fetchLiveNewsBundle(query: string) {
   const normalizedQuery = normalizeQuery(query || "e-ticaret finans");
   const responses = await fetchFirstSerpResults<SerpNewsResponse>([
-    { engine: "google_news", q: `"${normalizedQuery}"`, gl: "tr", hl: "tr" },
+    { engine: "google_news", q: `"${normalizedQuery}"`, gl: "us", hl: "en" },
+    { engine: "google_news", q: `${normalizedQuery} latest news`, gl: "us", hl: "en" },
+    { engine: "google_news", q: `${normalizedQuery} analysis trend`, gl: "gb", hl: "en" },
+    { engine: "google_news", q: `${normalizedQuery} global market`, gl: "ca", hl: "en" },
     { engine: "google_news", q: `${normalizedQuery} haber son gelişme`, gl: "tr", hl: "tr" },
-    { engine: "google_news", q: `${normalizedQuery} analiz trend`, gl: "tr", hl: "tr" },
+    { engine: "google_news", q: `${normalizedQuery} analyse tendance`, gl: "fr", hl: "fr" },
   ]);
   return uniqueBy(
     responses.flatMap((data) => data.news_results ?? [])
@@ -548,6 +585,7 @@ Kurallar:
 - Cevabı kısa tut. Gereksiz veri dökme.
 - Haber, trend ve tedarik linklerini destekleyici sinyal olarak kullan; kesin stok veya yatırım emri verme.
 - Ürün takibi ve haber aramasında sadece verilen marka/model/konu ile eşleşen sonuçları anlat; alakasız genel sonuç uydurma.
+- Ürün ve fiyat sonuçları kullanıcının bölgesine/para birimine göre gelir; haberleri global kaynak sinyali olarak değerlendir.
 - Tedarik sonucu azsa bunu açıkça söyle, eksik veriyi tamamlamaya çalışma.
 - Hisse, fon, coin veya yatırım alanlarında mutlaka "yatırım tavsiyesi değildir" de.
 - Eğer veri yoksa kullanıcıya panelden gelir/gider eklemesini söyle.
@@ -616,6 +654,7 @@ export async function POST(request: Request) {
     const summary = buildBudgetSummary(entries);
     const { command, text } = parseCommand(message);
     const amount = parseAmount(text);
+    const searchRegion = getSearchRegion(request);
 
     let localReply = commandHelp;
 
@@ -634,7 +673,7 @@ export async function POST(request: Request) {
       if (text) await rememberWatchTopic(supabase, userData.user.id, text, "product_watch");
       if (text) {
         const normalizedText = normalizeQuery(text);
-        const liveBundle = await fetchLiveProductBundle(text);
+        const liveBundle = await fetchLiveProductBundle(text, searchRegion);
         await persistLiveAgentResults(liveBundle);
         signals = [...liveBundle.signals, ...signals.filter((item) => normalizeQuery(item.product_name) === normalizedText)];
         suppliers = [...liveBundle.suppliers, ...suppliers.filter((item) => normalizeQuery(item.product_name) === normalizedText)];
