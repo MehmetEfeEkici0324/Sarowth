@@ -306,7 +306,8 @@ function SpendingDonut({ categories, total }: { categories: Array<[string, numbe
   let offset = 0;
   const segments = source.map((item, index) => {
     const rawLength = (item.percent / 100) * circumference;
-    const visibleLength = item.percent > 0 ? Math.max(rawLength - 2, 5) : 0;
+    const gap = source.length > 1 && rawLength > 3 ? 1.5 : 0;
+    const visibleLength = Math.max(0, rawLength - gap);
     const segment = {
       ...item,
       color: colors[index % colors.length],
@@ -332,7 +333,7 @@ function SpendingDonut({ categories, total }: { categories: Array<[string, numbe
               fill="none"
               stroke={segment.color}
               strokeWidth="34"
-              strokeLinecap="round"
+              strokeLinecap="butt"
               strokeDasharray={segment.dash}
               strokeDashoffset={segment.offset}
               transform="rotate(-90 110 110)"
@@ -392,16 +393,20 @@ function InvestmentSection({ income, expenses, savings, topExpense, marketSignal
         <h2 className="text-2xl font-semibold tracking-[-0.03em]">Agent sermaye kararı</h2>
       </div>
       <p className="mt-3 text-sm leading-6 text-slate-400">Bütçe motoru serbest alanı ayırır; trend agent bu alanla test edilebilecek en mantıklı küçük hamleyi seçer.</p>
-      <div className="mt-5 grid gap-3 sm:grid-cols-3">
-        <div className="rounded-2xl border border-emerald-300/15 bg-emerald-400/10 p-4">
-          <p className="text-xs uppercase tracking-[0.2em] text-emerald-200/70">Serbest alan</p>
-          <p className="mt-2 text-2xl font-semibold text-white">₺{freeCapital.toLocaleString("tr-TR")}</p>
+      <div className="mt-5 grid gap-3 lg:grid-cols-[0.72fr_1.28fr]">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+          <div className="min-h-36 rounded-2xl border border-emerald-300/15 bg-emerald-400/10 p-4">
+            <p className="text-xs uppercase tracking-[0.2em] text-emerald-200/70">Serbest alan</p>
+            <p className="mt-2 text-2xl font-semibold text-white">₺{freeCapital.toLocaleString("tr-TR")}</p>
+            <p className="mt-3 text-xs leading-5 text-emerald-50/60">Gelirden gider ve birikim ayrıldıktan sonra kalan güvenli hareket alanı.</p>
+          </div>
+          <div className="min-h-36 rounded-2xl border border-blue-300/15 bg-blue-400/10 p-4">
+            <p className="text-xs uppercase tracking-[0.2em] text-blue-200/70">Test bütçesi</p>
+            <p className="mt-2 text-2xl font-semibold text-white">₺{testBudget.toLocaleString("tr-TR")}</p>
+            <p className="mt-3 text-xs leading-5 text-blue-50/60">Ürün, reklam veya tedarik denemesi için ayrılabilecek küçük kontrollü pay.</p>
+          </div>
         </div>
-        <div className="rounded-2xl border border-blue-300/15 bg-blue-400/10 p-4">
-          <p className="text-xs uppercase tracking-[0.2em] text-blue-200/70">Test bütçesi</p>
-          <p className="mt-2 text-2xl font-semibold text-white">₺{testBudget.toLocaleString("tr-TR")}</p>
-        </div>
-        <div className="rounded-2xl border border-amber-300/15 bg-amber-400/10 p-4">
+        <div className="rounded-2xl border border-amber-300/15 bg-amber-400/10 p-5 lg:p-6">
           <p className="text-xs uppercase tracking-[0.2em] text-amber-200/70">Risk bandı</p>
           <RiskGauge score={riskScore} label={riskLevel} />
           <p className="mt-2 text-center text-xs leading-5 text-amber-50/70">{riskDetail}</p>
@@ -431,8 +436,8 @@ function RiskGauge({ score, label }: { score: number; label: string }) {
 
   return (
     <div className="mt-3">
-      <div className={`relative mx-auto rounded-3xl bg-black/20 p-2 shadow-2xl ${glowClass}`}>
-        <svg viewBox="0 0 200 128" className="h-32 w-full" aria-label={`Risk skoru ${score}/100`}>
+      <div className={`relative mx-auto max-w-md rounded-3xl bg-black/20 p-2 shadow-2xl ${glowClass}`}>
+        <svg viewBox="0 0 200 128" className="h-40 w-full sm:h-44" aria-label={`Risk skoru ${score}/100`}>
           <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="22" strokeLinecap="round" pathLength="100" />
           <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#22c55e" strokeWidth="22" strokeLinecap="round" pathLength="100" strokeDasharray="58 100" strokeDashoffset="0" />
           <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#facc15" strokeWidth="22" strokeLinecap="round" pathLength="100" strokeDasharray="24 100" strokeDashoffset="-58" />
@@ -448,8 +453,8 @@ function RiskGauge({ score, label }: { score: number; label: string }) {
           <circle cx="100" cy="100" r="9" fill="#050505" stroke="rgba(255,255,255,0.55)" strokeWidth="2" />
           <circle cx="100" cy="100" r="4" fill="white" />
         </svg>
-        <div className="pointer-events-none absolute inset-x-0 bottom-2 text-center">
-          <p className="text-3xl font-semibold leading-none text-white">{score}/100</p>
+        <div className="pointer-events-none absolute inset-x-0 bottom-4 text-center">
+          <p className="text-4xl font-semibold leading-none text-white">{score}/100</p>
           <p className={`mt-2 text-xs font-semibold uppercase tracking-[0.22em] ${labelClass}`}>{label}</p>
         </div>
       </div>
