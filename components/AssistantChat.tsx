@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Send } from "lucide-react";
+import { RefreshCw, Send } from "lucide-react";
 
 interface Message {
   role: "user" | "assistant";
@@ -13,6 +13,23 @@ interface AssistantChatProps {
   initialMessages?: Message[];
 }
 
+interface LastSearchAction {
+  command: "haber" | "takip";
+  topic: string;
+}
+
+function getSearchAction(message: string): LastSearchAction | null {
+  const trimmed = message.trim();
+  const lower = trimmed.toLocaleLowerCase("tr-TR");
+  const newsPrefixes = ["haber ", "haberleri ", "gündem ", "piyasa haberi "];
+  const productPrefixes = ["takip ", "izle ", "ürün takip ", "ürün ara ", "urun takip ", "urun ara ", "tedarik "];
+  const newsPrefix = newsPrefixes.find((prefix) => lower.startsWith(prefix));
+  if (newsPrefix) return { command: "haber", topic: trimmed.slice(newsPrefix.length).replace(/\b(yenile|yeniden|tekrar|refresh|başka|baska)\b/gi, "").trim() };
+  const productPrefix = productPrefixes.find((prefix) => lower.startsWith(prefix));
+  if (productPrefix) return { command: "takip", topic: trimmed.slice(productPrefix.length).replace(/\b(yenile|yeniden|tekrar|refresh|başka|baska)\b/gi, "").trim() };
+  return null;
+}
+
 export function AssistantChat({ onDashboardData, initialMessages = [] }: AssistantChatProps) {
   const [messages, setMessages] = useState<Message[]>(initialMessages.length > 0 ? initialMessages : [
     {
@@ -21,6 +38,7 @@ export function AssistantChat({ onDashboardData, initialMessages = [] }: Assista
     },
   ]);
   const [input, setInput] = useState("");
+  const [lastSearchAction, setLastSearchAction] = useState<LastSearchAction | null>(null);
   const [isPending, startTransition] = useTransition();
 
   function sendMessage(nextInput = input) {
@@ -29,6 +47,8 @@ export function AssistantChat({ onDashboardData, initialMessages = [] }: Assista
 
     setInput("");
     setMessages((current) => [...current, { role: "user", content }]);
+    const nextSearchAction = getSearchAction(content);
+    if (nextSearchAction?.topic) setLastSearchAction(nextSearchAction);
 
     startTransition(async () => {
       try {
@@ -74,12 +94,36 @@ export function AssistantChat({ onDashboardData, initialMessages = [] }: Assista
         ))}
       </div>
 
+      {lastSearchAction ? (
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => sendMessage(`${lastSearchAction.command} ${lastSearchAction.topic} yenile`)}
+            disabled={isPending}
+            className="inline-flex items-center gap-2 rounded-full border border-emerald-300/20 bg-emerald-400/10 px-4 py-2 text-sm font-medium text-emerald-100 transition hover:border-emerald-300/40 disabled:opacity-60"
+          >
+            <RefreshCw size={15} /> {lastSearchAction.command === "haber" ? "Haberleri yenile" : "Ürün sonuçlarını yenile"}
+          </button>
+          <span className="rounded-full border border-white/10 bg-black/20 px-4 py-2 text-xs text-slate-500">Yeni sonuçlar önceki linkler hariç aranır.</span>
+        </div>
+      ) : null}
+
       <div className="mt-6 grid max-h-[26rem] min-w-0 gap-3 overflow-y-auto overflow-x-hidden rounded-3xl border border-white/10 bg-black/25 p-4">
         {messages.map((message, index) => (
           <div key={index} className={message.role === "user" ? "ml-auto max-w-[85%] overflow-hidden break-words whitespace-pre-wrap rounded-3xl bg-emerald-400 px-4 py-3 text-sm font-medium text-[#03110c]" : "mr-auto max-w-[85%] overflow-hidden break-words whitespace-pre-wrap rounded-3xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm leading-6 text-slate-200"}>
             {message.content}
           </div>
         ))}
+        {isPending ? (
+          <div className="mr-auto inline-flex max-w-[85%] items-center gap-3 rounded-3xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-slate-300">
+            <span>Asistan düşünüyor</span>
+            <span className="flex items-center gap-1" aria-hidden="true">
+              <span className="h-2 w-2 animate-bounce rounded-full bg-emerald-300 [animation-delay:-0.2s]" />
+              <span className="h-2 w-2 animate-bounce rounded-full bg-emerald-300 [animation-delay:-0.1s]" />
+              <span className="h-2 w-2 animate-bounce rounded-full bg-emerald-300" />
+            </span>
+          </div>
+        ) : null}
       </div>
 
       <div className="mt-4 flex gap-3">
@@ -96,7 +140,7 @@ export function AssistantChat({ onDashboardData, initialMessages = [] }: Assista
           className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none placeholder:text-slate-500 focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-400/10"
         />
         <button type="button" onClick={() => sendMessage()} disabled={isPending} className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-400 to-blue-500 px-5 py-3 font-semibold text-[#03110c] disabled:opacity-60">
-          <Send size={17} /> {isPending ? "Düşünüyor" : "Gönder"}
+          <Send size={17} /> {isPending ? "Düşünüyor..." : "Gönder"}
         </button>
       </div>
     </section>

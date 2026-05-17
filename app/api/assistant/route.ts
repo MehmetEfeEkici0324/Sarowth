@@ -160,6 +160,18 @@ function parseProductSearchText(text: string) {
   return { query, scope };
 }
 
+function parseRefreshText(text: string) {
+  return text
+    .replace(/\b(sonuçları|sonuclari|sonuç|sonuc|haberleri|ürünleri|urunleri|ürün|urun)\b/gi, " ")
+    .replace(/\b(yenile|yeniden|tekrar|refresh|başka|baska)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isRefreshRequest(message: string) {
+  return /\b(yenile|yeniden|tekrar|refresh|başka|baska)\b/i.test(message);
+}
+
 function buildBudgetSummary(entries: BudgetEntry[]) {
   const income = entries.filter((entry) => entry.entry_type === "income").reduce((sum, entry) => sum + Number(entry.amount), 0);
   const expenses = entries.filter((entry) => entry.entry_type === "expense").reduce((sum, entry) => sum + Number(entry.amount), 0);
@@ -486,7 +498,7 @@ async function fetchSerpApi<T>(params: Record<string, string>) {
   }
 }
 
-async function fetchLiveProductBundle(productName: string, region: ReturnType<typeof getSearchRegion>, scope: ProductSearchScope = "local") {
+async function fetchLiveProductBundle(productName: string, region: ReturnType<typeof getSearchRegion>, scope: ProductSearchScope = "local", refresh = false, excludeUrls: string[] = []) {
   const normalizedProductName = normalizeQuery(productName);
   const exactQuery = `"${normalizedProductName}"`;
   const regionalParams: Record<string, string> = scope === "global" ? { gl: "us", hl: "en", location: "United States" } : { gl: region.gl, hl: region.hl };
@@ -496,10 +508,10 @@ async function fetchLiveProductBundle(productName: string, region: ReturnType<ty
   const secondaryGlobalParams: Record<string, string> = { gl: "gb", hl: "en", location: "United Kingdom", currency: region.currency };
   const [shoppingResponses, newsResponses] = await Promise.all([
     fetchFirstSerpResults<SerpShoppingResponse>([
-      { engine: "google_shopping", q: exactQuery, ...regionalParams },
-      { engine: "google_shopping", q: normalizedProductName, ...regionalParams },
-      { engine: "google_shopping", q: `${normalizedProductName} ${scope === "global" ? "buy price" : region.buyTerms}`, ...regionalParams },
-      { engine: "google_shopping", q: `${normalizedProductName} buy price`, ...secondaryGlobalParams },
+      { engine: "google_shopping", q: exactQuery, ...(refresh ? { start: "10" } : {}), ...regionalParams },
+      { engine: "google_shopping", q: normalizedProductName, ...(refresh ? { start: "20" } : {}), ...regionalParams },
+      { engine: "google_shopping", q: `${normalizedProductName} ${scope === "global" ? "buy price" : region.buyTerms}`, ...(refresh ? { start: "30" } : {}), ...regionalParams },
+      { engine: "google_shopping", q: `${normalizedProductName} buy price`, ...(refresh ? { start: "10" } : {}), ...secondaryGlobalParams },
     ]),
     fetchFirstSerpResults<SerpNewsResponse>([
       { engine: "google_news", q: exactQuery, gl: "us", hl: "en" },
@@ -513,6 +525,7 @@ async function fetchLiveProductBundle(productName: string, region: ReturnType<ty
   const shoppingResults = uniqueBy(
     shoppingResponses.flatMap((data) => data.shopping_results ?? [])
       .filter((item) => item.title && (item.link || item.product_link))
+      .filter((item) => !excludeUrls.includes(item.link ?? item.product_link ?? ""))
       .filter((item) => isRelevantSearchResult(normalizedProductName, `${item.title} ${item.source ?? ""}`, "product"))
       .sort((a, b) => scoreSearchMatch(normalizedProductName, `${b.title} ${b.source ?? ""}`) - scoreSearchMatch(normalizedProductName, `${a.title} ${a.source ?? ""}`)),
     (item) => item.link ?? item.product_link ?? item.title ?? "",
@@ -549,23 +562,28 @@ async function fetchLiveProductBundle(productName: string, region: ReturnType<ty
   return { signals, suppliers, news };
 }
 
-async function fetchLiveNewsBundle(query: string) {
+async function fetchLiveNewsBundle(query: string, refresh = false, excludeUrls: string[] = []) {
   const normalizedQuery = normalizeQuery(query || "e-ticaret finans");
   const responses = await fetchFirstSerpResults<SerpNewsResponse>([
-    { engine: "google_news", q: `"${normalizedQuery}"`, gl: "us", hl: "en" },
-    { engine: "google_news", q: `${normalizedQuery} latest news`, gl: "us", hl: "en" },
-    { engine: "google_news", q: `${normalizedQuery} analysis trend`, gl: "gb", hl: "en" },
-    { engine: "google_news", q: `${normalizedQuery} global market`, gl: "ca", hl: "en" },
-    { engine: "google_news", q: `${normalizedQuery} haber son gelişme`, gl: "tr", hl: "tr" },
-    { engine: "google_news", q: `${normalizedQuery} analyse tendance`, gl: "fr", hl: "fr" },
+    { engine: "google_news", q: `"${normalizedQuery}"`, gl: "us", hl: "en", ...(refresh ? { start: "10" } : {}) },
+    { engine: "google_news", q: `${normalizedQuery} latest news stock market`, gl: "us", hl: "en", ...(refresh ? { start: "20" } : {}) },
+    { engine: "google_news", q: `${normalizedQuery} analysis trend shares`, gl: "gb", hl: "en", ...(refresh ? { start: "30" } : {}) },
+    { engine: "google_news", q: `${normalizedQuery} global market finance`, gl: "ca", hl: "en", ...(refresh ? { start: "40" } : {}) },
+    { engine: "google_news", q: `${normalizedQuery} haber son gelişme hisse`, gl: "tr", hl: "tr", ...(refresh ? { start: "10" } : {}) },
+    { engine: "google_news", q: `${normalizedQuery} analyse tendance bourse`, gl: "fr", hl: "fr", ...(refresh ? { start: "10" } : {}) },
   ]);
-  return uniqueBy(
+  const allResults = uniqueBy(
     responses.flatMap((data) => data.news_results ?? [])
       .filter((item) => item.title && item.link)
-      .filter((item) => isRelevantSearchResult(normalizedQuery, `${item.title} ${item.snippet ?? ""}`, "news"))
-      .sort((a, b) => scoreSearchMatch(normalizedQuery, `${b.title} ${b.snippet ?? ""}`) - scoreSearchMatch(normalizedQuery, `${a.title} ${a.snippet ?? ""}`)),
+      .filter((item) => !excludeUrls.includes(item.link ?? "")),
     (item) => item.link ?? item.title ?? "",
-  ).slice(0, 8).map((item) => ({
+  );
+  const relevantResults = allResults
+    .filter((item) => isRelevantSearchResult(normalizedQuery, `${item.title} ${item.snippet ?? ""}`, "news"))
+    .sort((a, b) => scoreSearchMatch(normalizedQuery, `${b.title} ${b.snippet ?? ""}`) - scoreSearchMatch(normalizedQuery, `${a.title} ${a.snippet ?? ""}`));
+  const selectedResults = relevantResults.length > 0 ? relevantResults : allResults;
+
+  return selectedResults.slice(0, 8).map((item) => ({
     title: item.title as string,
     source: getSerpNewsSource(item.source),
     url: item.link as string,
@@ -733,27 +751,33 @@ export async function POST(request: Request) {
     if (command === "al") {
       localReply = amount ? getPurchaseDecision(amount, summary) : "Satın alma kararı için tutar yazmalısın. Örnek: al Nike ayakkabı 2400 TL";
     } else if (command === "haber") {
-      if (text) await rememberWatchTopic(supabase, userData.user.id, text, "news_watch");
-      const normalizedText = normalizeQuery(text);
-      const liveNews = await fetchLiveNewsBundle(text);
+      const refresh = isRefreshRequest(message);
+      const newsQuery = refresh ? parseRefreshText(text) || text : text;
+      if (newsQuery) await rememberWatchTopic(supabase, userData.user.id, newsQuery, "news_watch");
+      const normalizedText = normalizeQuery(newsQuery);
+      const existingNewsForTopic = news.filter((item) => normalizeQuery(item.topic ?? "") === normalizedText);
+      const liveNews = await fetchLiveNewsBundle(newsQuery, refresh, refresh ? existingNewsForTopic.map((item) => item.url) : []);
       await persistLiveAgentResults({ signals: [], news: liveNews, suppliers: [] });
-      news = [...liveNews, ...news.filter((item) => normalizeQuery(item.topic ?? "") === normalizedText)];
+      news = refresh ? liveNews : [...liveNews, ...news.filter((item) => normalizeQuery(item.topic ?? "") === normalizedText)];
       signals = [];
       suppliers = [];
-      localReply = buildNewsReply(text, news);
+      dashboardTopic = newsQuery || undefined;
+      localReply = refresh && liveNews.length === 0 ? `Bu konu için önceki linklerden farklı yeni haber bulamadım: ${newsQuery}. Aynı sonuçları tekrar göstermiyorum; biraz sonra tekrar yenileyebilirsin.` : buildNewsReply(newsQuery, news);
     } else if (command === "takip") {
-      const productSearch = parseProductSearchText(text);
+      const refresh = isRefreshRequest(message);
+      const productSearch = parseProductSearchText(refresh ? parseRefreshText(text) || text : text);
       dashboardTopic = productSearch.query || undefined;
       if (productSearch.query) await rememberWatchTopic(supabase, userData.user.id, productSearch.query, "product_watch");
       if (productSearch.query) {
         const normalizedText = normalizeQuery(productSearch.query);
-        const liveBundle = await fetchLiveProductBundle(productSearch.query, searchRegion, productSearch.scope);
+        const existingSuppliersForTopic = suppliers.filter((item) => normalizeQuery(item.product_name) === normalizedText);
+        const liveBundle = await fetchLiveProductBundle(productSearch.query, searchRegion, productSearch.scope, refresh, refresh ? existingSuppliersForTopic.map((item) => item.url) : []);
         await persistLiveAgentResults(liveBundle);
-        signals = [...liveBundle.signals, ...signals.filter((item) => normalizeQuery(item.product_name) === normalizedText)];
-        suppliers = [...liveBundle.suppliers, ...suppliers.filter((item) => normalizeQuery(item.product_name) === normalizedText)];
-        news = [...liveBundle.news, ...news.filter((item) => normalizeQuery(item.topic ?? "") === normalizedText)];
+        signals = refresh ? liveBundle.signals : [...liveBundle.signals, ...signals.filter((item) => normalizeQuery(item.product_name) === normalizedText)];
+        suppliers = refresh ? liveBundle.suppliers : [...liveBundle.suppliers, ...suppliers.filter((item) => normalizeQuery(item.product_name) === normalizedText)];
+        news = refresh ? liveBundle.news : [...liveBundle.news, ...news.filter((item) => normalizeQuery(item.topic ?? "") === normalizedText)];
       }
-      localReply = productSearch.query ? buildTrackingReply(productSearch.query, signals, suppliers, productSearch.scope) : "Takip etmek istediğin ürünü yaz. Örnek: takip ürün adı veya takip ürün adı global";
+      localReply = productSearch.query && refresh && suppliers.length === 0 ? `Bu ürün için önceki linklerden farklı yeni tedarik sonucu bulamadım: ${productSearch.query}. Aynı sonuçları tekrar göstermiyorum; biraz sonra tekrar yenileyebilirsin.` : productSearch.query ? buildTrackingReply(productSearch.query, signals, suppliers, productSearch.scope) : "Takip etmek istediğin ürünü yaz. Örnek: takip ürün adı veya takip ürün adı global";
     } else if (command === "yatirim") {
       await rememberWatchTopic(supabase, userData.user.id, "yatırım fırsatları", "investment_watch");
       localReply = buildInvestmentReply(summary);
