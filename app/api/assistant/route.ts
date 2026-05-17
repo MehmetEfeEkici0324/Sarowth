@@ -37,6 +37,16 @@ interface SupplierLink {
   score: number;
 }
 
+interface GeminiResponse {
+  candidates?: Array<{
+    content?: {
+      parts?: Array<{
+        text?: string;
+      }>;
+    };
+  }>;
+}
+
 const commandHelp = `Ne yapmak istediğini kısa yazabilirsin.
 
 Alışveriş kararı: al tişört 6000
@@ -206,6 +216,83 @@ async function rememberWatchTopic(supabase: Awaited<ReturnType<typeof createSupa
   });
 }
 
+async function generateGeminiReply({
+  message,
+  command,
+  localReply,
+  summary,
+  budgetEntries,
+  marketSignals,
+  news,
+  suppliers,
+}: {
+  message: string;
+  command: string;
+  localReply: string;
+  summary: ReturnType<typeof buildBudgetSummary>;
+  budgetEntries: BudgetEntry[];
+  marketSignals: MarketSignal[];
+  news: NewsItem[];
+  suppliers: SupplierLink[];
+}) {
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  if (!apiKey || command === "yardim") return localReply;
+
+  const model = process.env.GEMINI_MODEL?.trim() || "gemini-1.5-flash";
+  const context = {
+    budgetSummary: summary,
+    recentBudgetEntries: budgetEntries.slice(0, 30),
+    marketSignals: marketSignals.slice(0, 6),
+    financeNews: news.slice(0, 6),
+    supplierLinks: suppliers.slice(0, 8),
+    deterministicDecision: localReply,
+  };
+
+  const prompt = `Sen Sarowth'un Türkçe kişisel finans ve e-ticaret karar asistanısın.
+
+Kurallar:
+- Sadece kullanıcının son chat mesajına cevap ver.
+- Panelde girilen gelir, gider, birikim ve kategori verilerini esas al.
+- Satın alma kararında deterministicDecision kararını bozma; sadece daha doğal, kişisel ve okunabilir anlat.
+- Cevabı kısa tut. Gereksiz veri dökme.
+- Haber, trend ve tedarik linklerini destekleyici sinyal olarak kullan; kesin stok veya yatırım emri verme.
+- Hisse, fon, coin veya yatırım alanlarında mutlaka "yatırım tavsiyesi değildir" de.
+- Eğer veri yoksa kullanıcıya panelden gelir/gider eklemesini söyle.
+
+Kullanıcı mesajı: ${message}
+Komut türü: ${command}
+Bağlam: ${JSON.stringify(context)}`;
+
+  try {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey,
+      },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.35,
+          maxOutputTokens: 650,
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("GEMINI_AGENT_ERROR:", response.status, errorText.slice(0, 500));
+      return localReply;
+    }
+
+    const data = await response.json() as GeminiResponse;
+    return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || localReply;
+  } catch (error) {
+    console.error("GEMINI_AGENT_RUNTIME_ERROR:", error);
+    return localReply;
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as AssistantRequest;
@@ -237,24 +324,35 @@ export async function POST(request: Request) {
     const { command, text } = parseCommand(message);
     const amount = parseAmount(text);
 
-    let reply = commandHelp;
+    let localReply = commandHelp;
 
     if (command === "al") {
-      reply = amount ? getPurchaseDecision(amount, summary) : "Satın alma kararı için tutar yazmalısın. Örnek: /al Nike ayakkabı 2400 TL";
+      localReply = amount ? getPurchaseDecision(amount, summary) : "Satın alma kararı için tutar yazmalısın. Örnek: al Nike ayakkabı 2400 TL";
     } else if (command === "haber") {
       if (text) await rememberWatchTopic(supabase, userData.user.id, text, "news_watch");
-      reply = buildNewsReply(text, news);
+      localReply = buildNewsReply(text, news);
     } else if (command === "takip") {
       if (text) await rememberWatchTopic(supabase, userData.user.id, text, "product_watch");
-      reply = text ? buildTrackingReply(text, signals, suppliers) : "Takip etmek istediğin ürünü yaz. Örnek: /takip stres çarkı";
+      localReply = text ? buildTrackingReply(text, signals, suppliers) : "Takip etmek istediğin ürünü yaz. Örnek: takip stres çarkı";
     } else if (command === "yatirim") {
       await rememberWatchTopic(supabase, userData.user.id, "yatırım fırsatları", "investment_watch");
-      reply = buildInvestmentReply(summary);
+      localReply = buildInvestmentReply(summary);
     } else if (command === "ozet") {
-      reply = `Bütçe Özeti\n\nGelir: ₺${summary.income.toLocaleString("tr-TR")}\nGider: ₺${summary.expenses.toLocaleString("tr-TR")}\nTasarruf: ₺${summary.savings.toLocaleString("tr-TR")}\nSerbest alan: ₺${summary.available.toLocaleString("tr-TR")}\nEn yüksek kategori: ${summary.topCategory?.[0] ?? "Yok"}`;
+      localReply = `Bütçe Özeti\n\nGelir: ₺${summary.income.toLocaleString("tr-TR")}\nGider: ₺${summary.expenses.toLocaleString("tr-TR")}\nTasarruf: ₺${summary.savings.toLocaleString("tr-TR")}\nSerbest alan: ₺${summary.available.toLocaleString("tr-TR")}\nEn yüksek kategori: ${summary.topCategory?.[0] ?? "Yok"}`;
     } else {
-      reply = commandHelp;
+      localReply = commandHelp;
     }
+
+    const reply = await generateGeminiReply({
+      message,
+      command,
+      localReply,
+      summary,
+      budgetEntries: entries,
+      marketSignals: signals,
+      news,
+      suppliers,
+    });
 
     await supabase.from("assistant_messages").insert([
       { user_id: userData.user.id, role: "user", content: message },
