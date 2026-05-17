@@ -66,6 +66,16 @@ interface SerpNewsResponse {
   error?: string;
 }
 
+const searchStopWords = new Set([
+  "ve", "veya", "ile", "icin", "için", "bir", "bu", "su", "şu", "en", "iyi", "ucuz", "fiyat", "fiyatı", "fiyati", "satın", "satin", "al", "alma", "tedarik", "ürün", "urun", "haber", "trend", "son", "güncel", "guncel",
+]);
+
+const genericProductWords = new Set(["scooter", "elektrikli", "electric", "ürün", "urun", "model", "modelleri", "fiyat", "fiyatı", "fiyati"]);
+
+const queryCorrections: Record<string, string> = {
+  kaboo: "kaabo",
+};
+
 interface GeminiResponse {
   candidates?: Array<{
     content?: {
@@ -160,8 +170,11 @@ function getPurchaseDecision(amount: number, summary: ReturnType<typeof buildBud
 }
 
 function filterNews(query: string, news: NewsItem[]) {
-  const normalizedQuery = query.toLocaleLowerCase("tr-TR");
-  const filtered = news.filter((item) => `${item.title} ${item.summary ?? ""}`.toLocaleLowerCase("tr-TR").includes(normalizedQuery)).slice(0, 3);
+  const normalizedQuery = normalizeQuery(query);
+  const filtered = news
+    .filter((item) => isRelevantSearchResult(normalizedQuery, `${item.title} ${item.summary ?? ""}`, "news"))
+    .sort((a, b) => scoreSearchMatch(normalizedQuery, `${b.title} ${b.summary ?? ""}`) - scoreSearchMatch(normalizedQuery, `${a.title} ${a.summary ?? ""}`))
+    .slice(0, 4);
   return filtered.length > 0 ? filtered : news.slice(0, 3);
 }
 
@@ -175,17 +188,24 @@ function buildNewsReply(query: string, news: NewsItem[]) {
 }
 
 function buildTrackingReply(query: string, signals: MarketSignal[], suppliers: SupplierLink[]) {
-  const matched = signals.filter((item) => `${item.product_name} ${item.signal}`.toLocaleLowerCase("tr-TR").includes(query.toLocaleLowerCase("tr-TR"))).slice(0, 3);
-  const supplierItems = suppliers.filter((item) => `${item.product_name} ${item.title}`.toLocaleLowerCase("tr-TR").includes(query.toLocaleLowerCase("tr-TR"))).slice(0, 4);
+  const normalizedQuery = normalizeQuery(query);
+  const matched = signals
+    .filter((item) => isRelevantSearchResult(normalizedQuery, `${item.product_name} ${item.signal}`, "product"))
+    .sort((a, b) => scoreSearchMatch(normalizedQuery, `${b.product_name} ${b.signal}`) - scoreSearchMatch(normalizedQuery, `${a.product_name} ${a.signal}`))
+    .slice(0, 3);
+  const supplierItems = suppliers
+    .filter((item) => isRelevantSearchResult(normalizedQuery, `${item.product_name} ${item.title} ${item.source}`, "product"))
+    .sort((a, b) => scoreSearchMatch(normalizedQuery, `${b.product_name} ${b.title} ${b.source}`) - scoreSearchMatch(normalizedQuery, `${a.product_name} ${a.title} ${a.source}`))
+    .slice(0, 5);
 
   if (matched.length === 0 && supplierItems.length === 0) {
-    return `Takip başlatıldı: ${query}\n\nBu ürün için canlı veri bekleniyor. Agent çalıştığında trend, tedarik ve satış linkleri burada bundle olarak görünecek.`;
+    return `Takip başlatıldı: ${query}\n\nBu ürün için yüksek eşleşmeli canlı sonuç bulamadım. Marka/modeli koruyarak tekrar deneyebilirsin; örnek: takip Kaabo Wolf Warrior X elektrikli scooter. Alakasız scooter sonuçlarını özellikle filtreledim.`;
   }
 
   const signalText = matched.length > 0 ? matched.map((item) => `- ${item.product_name}: ${item.signal} (${item.score}/100)`).join("\n") : "- Trend skoru için yeterli sinyal yok; tedarik kartları üzerinden kontrol et.";
   const supplierText = supplierItems.length > 0 ? `\n\nTedarik kartları hazır:\n${supplierItems.map((item, index) => `${index + 1}. ${item.title} (${item.source}${item.price_text ? `, ${item.price_text}` : ""})`).join("\n")}\n\nLinklere aşağıdaki tedarik kartlarından tıklayabilirsin.` : "\n\nTedarik linkleri: Bu ürün için canlı tedarik sonucu bulunamadı.";
 
-  return `Ürün paketi hazır: ${query}\n\nTrend sinyali:\n${signalText}${supplierText}\n\nAjan notu: Stok almadan önce fiyat, kargo, iade ve düşük bütçeli talep testini kontrol et.`;
+  return `Ürün paketi hazır: ${query}\n\nTrend sinyali:\n${signalText}${supplierText}\n\nAjan notu: Sonuçlar marka/model kelime eşleşmesine göre filtrelendi. Stok almadan önce fiyat, kargo, iade ve düşük bütçeli talep testini kontrol et.`;
 }
 
 function buildInvestmentReply(summary: ReturnType<typeof buildBudgetSummary>) {
@@ -267,6 +287,85 @@ function getLiveScore(index: number, item: SerpShoppingResult) {
   return Math.min(100, base + ratingBonus);
 }
 
+function normalizeSearchText(value: string) {
+  return value
+    .toLocaleLowerCase("tr-TR")
+    .replace(/[ı]/g, "i")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9ğüşöçıİ\s-]/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function normalizeQuery(query: string) {
+  const normalized = normalizeSearchText(query);
+  return normalized.split(" ").map((token) => queryCorrections[token] ?? token).join(" ").trim();
+}
+
+function getSearchTokens(query: string) {
+  return normalizeQuery(query)
+    .split(" ")
+    .filter((token) => token && !searchStopWords.has(token) && (token.length > 1 || token === "x"));
+}
+
+function uniqueBy<T>(items: T[], key: (item: T) => string) {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const value = key(item);
+    if (!value || seen.has(value)) return false;
+    seen.add(value);
+    return true;
+  });
+}
+
+function scoreSearchMatch(query: string, candidate: string) {
+  const normalizedQuery = normalizeQuery(query);
+  const normalizedCandidate = normalizeSearchText(candidate);
+  const tokens = getSearchTokens(query);
+  if (tokens.length === 0) return 0;
+
+  const matchedTokens = tokens.filter((token) => normalizedCandidate.includes(token));
+  const essentialTokens = tokens.filter((token) => !genericProductWords.has(token));
+  const matchedEssential = essentialTokens.filter((token) => normalizedCandidate.includes(token));
+  const tokenScore = (matchedTokens.length / tokens.length) * 60;
+  const essentialScore = essentialTokens.length > 0 ? (matchedEssential.length / essentialTokens.length) * 25 : 15;
+  const exactScore = normalizedCandidate.includes(normalizedQuery) ? 35 : 0;
+  const firstTokenScore = tokens[0] && normalizedCandidate.includes(tokens[0]) ? 10 : 0;
+
+  return Math.round(Math.min(100, tokenScore + essentialScore + exactScore + firstTokenScore));
+}
+
+function isRelevantSearchResult(query: string, candidate: string, mode: "product" | "news") {
+  const tokens = getSearchTokens(query);
+  if (tokens.length === 0) return true;
+
+  const normalizedCandidate = normalizeSearchText(candidate);
+  const matchedTokens = tokens.filter((token) => normalizedCandidate.includes(token));
+  const essentialTokens = tokens.filter((token) => !genericProductWords.has(token));
+  const matchedEssential = essentialTokens.filter((token) => normalizedCandidate.includes(token));
+  const score = scoreSearchMatch(query, candidate);
+
+  if (mode === "news") {
+    return score >= 35 || matchedTokens.length >= Math.min(2, tokens.length);
+  }
+
+  if (tokens.length >= 4) {
+    return score >= 55 && matchedEssential.length >= Math.max(2, Math.ceil(essentialTokens.length * 0.6));
+  }
+
+  if (tokens.length >= 2) {
+    return score >= 48 && matchedTokens.length >= 2;
+  }
+
+  return score >= 45;
+}
+
+async function fetchFirstSerpResults<T extends { error?: string }>(queries: Array<Record<string, string>>) {
+  const results = await Promise.all(queries.map((params) => fetchSerpApi<T>(params)));
+  return results.filter(Boolean) as T[];
+}
+
 async function fetchSerpApi<T>(params: Record<string, string>) {
   const apiKey = process.env.SERPAPI_API_KEY?.trim();
   if (!apiKey) return null;
@@ -291,24 +390,47 @@ async function fetchSerpApi<T>(params: Record<string, string>) {
 }
 
 async function fetchLiveProductBundle(productName: string) {
-  const [shoppingData, newsData] = await Promise.all([
-    fetchSerpApi<SerpShoppingResponse>({ engine: "google_shopping", q: `${productName} tedarik satın al`, gl: "tr", hl: "tr" }),
-    fetchSerpApi<SerpNewsResponse>({ engine: "google_news", q: `${productName} trend haber e-ticaret`, gl: "tr", hl: "tr" }),
+  const normalizedProductName = normalizeQuery(productName);
+  const exactQuery = `"${normalizedProductName}"`;
+  const [shoppingResponses, newsResponses] = await Promise.all([
+    fetchFirstSerpResults<SerpShoppingResponse>([
+      { engine: "google_shopping", q: exactQuery, gl: "tr", hl: "tr" },
+      { engine: "google_shopping", q: normalizedProductName, gl: "tr", hl: "tr" },
+      { engine: "google_shopping", q: `${normalizedProductName} satın al fiyat`, gl: "tr", hl: "tr" },
+      { engine: "google_shopping", q: `${normalizedProductName} buy price`, gl: "us", hl: "en" },
+    ]),
+    fetchFirstSerpResults<SerpNewsResponse>([
+      { engine: "google_news", q: exactQuery, gl: "tr", hl: "tr" },
+      { engine: "google_news", q: `${normalizedProductName} haber inceleme`, gl: "tr", hl: "tr" },
+      { engine: "google_news", q: `${normalizedProductName} review news`, gl: "us", hl: "en" },
+    ]),
   ]);
 
-  const shoppingResults = (shoppingData?.shopping_results ?? []).filter((item) => item.title && (item.link || item.product_link)).slice(0, 6);
-  const newsResults = (newsData?.news_results ?? []).filter((item) => item.title && item.link).slice(0, 4);
+  const shoppingResults = uniqueBy(
+    shoppingResponses.flatMap((data) => data.shopping_results ?? [])
+      .filter((item) => item.title && (item.link || item.product_link))
+      .filter((item) => isRelevantSearchResult(normalizedProductName, `${item.title} ${item.source ?? ""}`, "product"))
+      .sort((a, b) => scoreSearchMatch(normalizedProductName, `${b.title} ${b.source ?? ""}`) - scoreSearchMatch(normalizedProductName, `${a.title} ${a.source ?? ""}`)),
+    (item) => item.link ?? item.product_link ?? item.title ?? "",
+  ).slice(0, 8);
+  const newsResults = uniqueBy(
+    newsResponses.flatMap((data) => data.news_results ?? [])
+      .filter((item) => item.title && item.link)
+      .filter((item) => isRelevantSearchResult(normalizedProductName, `${item.title} ${item.snippet ?? ""}`, "news"))
+      .sort((a, b) => scoreSearchMatch(normalizedProductName, `${b.title} ${b.snippet ?? ""}`) - scoreSearchMatch(normalizedProductName, `${a.title} ${a.snippet ?? ""}`)),
+    (item) => item.link ?? item.title ?? "",
+  ).slice(0, 6);
   const suppliers: SupplierLink[] = shoppingResults.map((item, index) => ({
-    product_name: productName,
+    product_name: normalizedProductName,
     title: item.title as string,
     url: (item.link ?? item.product_link) as string,
     source: item.source ?? "Google Shopping",
     price_text: item.price ?? (item.extracted_price ? `₺${item.extracted_price}` : null),
-    score: getLiveScore(index, item),
+    score: Math.max(getLiveScore(index, item), scoreSearchMatch(normalizedProductName, `${item.title} ${item.source ?? ""}`)),
   }));
   const signals: MarketSignal[] = shoppingResults.length > 0 ? [{
-    product_name: productName,
-    signal: `${shoppingResults.length} canlı tedarik sonucu bulundu. En güçlü kaynak: ${suppliers[0]?.source ?? "Google Shopping"}${suppliers[0]?.price_text ? `, fiyat: ${suppliers[0].price_text}` : ""}.`,
+    product_name: normalizedProductName,
+    signal: `${shoppingResults.length} alakalı canlı tedarik sonucu bulundu. En güçlü kaynak: ${suppliers[0]?.source ?? "Google Shopping"}${suppliers[0]?.price_text ? `, fiyat: ${suppliers[0].price_text}` : ""}. Arama marka/model eşleşmesine göre filtrelendi.`,
     score: suppliers[0]?.score ?? 70,
     source_url: suppliers[0]?.url,
   }] : [];
@@ -316,20 +438,32 @@ async function fetchLiveProductBundle(productName: string) {
     title: item.title as string,
     source: getSerpNewsSource(item.source),
     url: item.link as string,
-    summary: item.snippet ?? `${productName} için canlı haber sinyali.`,
+    topic: normalizedProductName,
+    summary: item.snippet ?? `${normalizedProductName} için canlı haber sinyali.`,
   }));
 
   return { signals, suppliers, news };
 }
 
 async function fetchLiveNewsBundle(query: string) {
-  const newsData = await fetchSerpApi<SerpNewsResponse>({ engine: "google_news", q: `${query || "e-ticaret finans"} haber trend`, gl: "tr", hl: "tr" });
-  return (newsData?.news_results ?? []).filter((item) => item.title && item.link).slice(0, 6).map((item) => ({
+  const normalizedQuery = normalizeQuery(query || "e-ticaret finans");
+  const responses = await fetchFirstSerpResults<SerpNewsResponse>([
+    { engine: "google_news", q: `"${normalizedQuery}"`, gl: "tr", hl: "tr" },
+    { engine: "google_news", q: `${normalizedQuery} haber son gelişme`, gl: "tr", hl: "tr" },
+    { engine: "google_news", q: `${normalizedQuery} analiz trend`, gl: "tr", hl: "tr" },
+  ]);
+  return uniqueBy(
+    responses.flatMap((data) => data.news_results ?? [])
+      .filter((item) => item.title && item.link)
+      .filter((item) => isRelevantSearchResult(normalizedQuery, `${item.title} ${item.snippet ?? ""}`, "news"))
+      .sort((a, b) => scoreSearchMatch(normalizedQuery, `${b.title} ${b.snippet ?? ""}`) - scoreSearchMatch(normalizedQuery, `${a.title} ${a.snippet ?? ""}`)),
+    (item) => item.link ?? item.title ?? "",
+  ).slice(0, 8).map((item) => ({
     title: item.title as string,
     source: getSerpNewsSource(item.source),
     url: item.link as string,
-    topic: query,
-    summary: item.snippet ?? `${query} için canlı haber sinyali.`,
+    topic: normalizedQuery,
+    summary: item.snippet ?? `${normalizedQuery} için canlı haber sinyali.`,
   }));
 }
 
@@ -413,6 +547,8 @@ Kurallar:
 - Satın alma kararında deterministicDecision kararını bozma; sadece daha doğal, kişisel ve okunabilir anlat.
 - Cevabı kısa tut. Gereksiz veri dökme.
 - Haber, trend ve tedarik linklerini destekleyici sinyal olarak kullan; kesin stok veya yatırım emri verme.
+- Ürün takibi ve haber aramasında sadece verilen marka/model/konu ile eşleşen sonuçları anlat; alakasız genel sonuç uydurma.
+- Tedarik sonucu azsa bunu açıkça söyle, eksik veriyi tamamlamaya çalışma.
 - Hisse, fon, coin veya yatırım alanlarında mutlaka "yatırım tavsiyesi değildir" de.
 - Eğer veri yoksa kullanıcıya panelden gelir/gider eklemesini söyle.
 
@@ -487,20 +623,22 @@ export async function POST(request: Request) {
       localReply = amount ? getPurchaseDecision(amount, summary) : "Satın alma kararı için tutar yazmalısın. Örnek: al Nike ayakkabı 2400 TL";
     } else if (command === "haber") {
       if (text) await rememberWatchTopic(supabase, userData.user.id, text, "news_watch");
+      const normalizedText = normalizeQuery(text);
       const liveNews = await fetchLiveNewsBundle(text);
       await persistLiveAgentResults({ signals: [], news: liveNews, suppliers: [] });
-      news = [...liveNews, ...news.filter((item) => item.topic === text)];
+      news = [...liveNews, ...news.filter((item) => normalizeQuery(item.topic ?? "") === normalizedText)];
       signals = [];
       suppliers = [];
       localReply = buildNewsReply(text, news);
     } else if (command === "takip") {
       if (text) await rememberWatchTopic(supabase, userData.user.id, text, "product_watch");
       if (text) {
+        const normalizedText = normalizeQuery(text);
         const liveBundle = await fetchLiveProductBundle(text);
         await persistLiveAgentResults(liveBundle);
-        signals = [...liveBundle.signals, ...signals.filter((item) => item.product_name === text)];
-        suppliers = [...liveBundle.suppliers, ...suppliers.filter((item) => item.product_name === text)];
-        news = [...liveBundle.news, ...news.filter((item) => item.topic === text)];
+        signals = [...liveBundle.signals, ...signals.filter((item) => normalizeQuery(item.product_name) === normalizedText)];
+        suppliers = [...liveBundle.suppliers, ...suppliers.filter((item) => normalizeQuery(item.product_name) === normalizedText)];
+        news = [...liveBundle.news, ...news.filter((item) => normalizeQuery(item.topic ?? "") === normalizedText)];
       }
       localReply = text ? buildTrackingReply(text, signals, suppliers) : "Takip etmek istediğin ürünü yaz. Örnek: takip ürün adı";
     } else if (command === "yatirim") {
