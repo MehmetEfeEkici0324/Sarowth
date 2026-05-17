@@ -32,7 +32,6 @@ const seedSignals: MarketSignal[] = [
 ];
 
 async function fetchMarketSignals(): Promise<MarketSignal[]> {
-  // Gerçek piyasa sağlayıcısı bağlanınca sadece bu fonksiyon değişecek.
   return seedSignals;
 }
 

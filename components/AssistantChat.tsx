@@ -23,15 +23,41 @@ interface ResultExclusions {
   titles: string[];
 }
 
+interface AssistantDashboardData {
+  finansHaberleri?: Array<{ title?: string; url?: string }>;
+  tedarikLinkleri?: Array<{ title?: string; url?: string }>;
+}
+
+const refreshPattern = /\b(yenile|yeniden|tekrar|refresh|başka|baska)\b/gi;
+const newsPrefixes = ["haber ", "haberleri ", "gündem ", "piyasa haberi "];
+const productPrefixes = ["takip ", "izle ", "ürün takip ", "ürün ara ", "urun takip ", "urun ara ", "tedarik "];
+
+function stripRefreshWords(value: string) {
+  return value.replace(refreshPattern, "").trim();
+}
+
+function isRefreshMessage(value: string) {
+  refreshPattern.lastIndex = 0;
+  return refreshPattern.test(value);
+}
+
+function getDashboardExclusions(data: AssistantDashboardData): ResultExclusions {
+  const news = Array.isArray(data.finansHaberleri) ? data.finansHaberleri : [];
+  const suppliers = Array.isArray(data.tedarikLinkleri) ? data.tedarikLinkleri : [];
+
+  return {
+    urls: [...news.map((item) => item.url), ...suppliers.map((item) => item.url)].filter(Boolean) as string[],
+    titles: [...news.map((item) => item.title), ...suppliers.map((item) => item.title)].filter(Boolean) as string[],
+  };
+}
+
 function getSearchAction(message: string): LastSearchAction | null {
   const trimmed = message.trim();
   const lower = trimmed.toLocaleLowerCase("tr-TR");
-  const newsPrefixes = ["haber ", "haberleri ", "gündem ", "piyasa haberi "];
-  const productPrefixes = ["takip ", "izle ", "ürün takip ", "ürün ara ", "urun takip ", "urun ara ", "tedarik "];
   const newsPrefix = newsPrefixes.find((prefix) => lower.startsWith(prefix));
-  if (newsPrefix) return { command: "haber", topic: trimmed.slice(newsPrefix.length).replace(/\b(yenile|yeniden|tekrar|refresh|başka|baska)\b/gi, "").trim() };
+  if (newsPrefix) return { command: "haber", topic: stripRefreshWords(trimmed.slice(newsPrefix.length)) };
   const productPrefix = productPrefixes.find((prefix) => lower.startsWith(prefix));
-  if (productPrefix) return { command: "takip", topic: trimmed.slice(productPrefix.length).replace(/\b(yenile|yeniden|tekrar|refresh|başka|baska)\b/gi, "").trim() };
+  if (productPrefix) return { command: "takip", topic: stripRefreshWords(trimmed.slice(productPrefix.length)) };
   return null;
 }
 
@@ -55,7 +81,7 @@ export function AssistantChat({ onDashboardData, initialMessages = [] }: Assista
     setMessages((current) => [...current, { role: "user", content }]);
     const nextSearchAction = getSearchAction(content);
     if (nextSearchAction?.topic) setLastSearchAction(nextSearchAction);
-    const isRefresh = /\b(yenile|yeniden|tekrar|refresh|başka|baska)\b/i.test(content);
+    const isRefresh = isRefreshMessage(content);
 
     startTransition(async () => {
       try {
@@ -69,12 +95,7 @@ export function AssistantChat({ onDashboardData, initialMessages = [] }: Assista
         });
         const data = await response.json();
         if (data.dashboardData) {
-          const news = Array.isArray(data.dashboardData.finansHaberleri) ? data.dashboardData.finansHaberleri : [];
-          const suppliers = Array.isArray(data.dashboardData.tedarikLinkleri) ? data.dashboardData.tedarikLinkleri : [];
-          setResultExclusions({
-            urls: [...news.map((item: { url?: string }) => item.url).filter(Boolean), ...suppliers.map((item: { url?: string }) => item.url).filter(Boolean)] as string[],
-            titles: [...news.map((item: { title?: string }) => item.title).filter(Boolean), ...suppliers.map((item: { title?: string }) => item.title).filter(Boolean)] as string[],
-          });
+          setResultExclusions(getDashboardExclusions(data.dashboardData));
           onDashboardData?.(data.dashboardData);
         }
         setMessages((current) => [...current, { role: "assistant", content: data.reply ?? "Şu anda yanıt üretilemedi." }]);
