@@ -407,7 +407,10 @@ function InvestmentSection({ income, expenses, savings, topExpense, marketSignal
           </div>
         </div>
         <div className="rounded-2xl border border-amber-300/15 bg-amber-400/10 p-5 lg:p-6">
-          <p className="text-xs uppercase tracking-[0.2em] text-amber-200/70">Risk bandı</p>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs uppercase tracking-[0.2em] text-amber-200/70">Risk bandı</p>
+            <span className="rounded-full border border-amber-200/20 bg-black/20 px-3 py-1 text-sm font-semibold text-white">{riskScore}/100</span>
+          </div>
           <RiskGauge score={riskScore} label={riskLevel} />
           <p className="mt-2 text-center text-xs leading-5 text-amber-50/70">{riskDetail}</p>
         </div>
@@ -453,9 +456,8 @@ function RiskGauge({ score, label }: { score: number; label: string }) {
           <circle cx="100" cy="100" r="9" fill="#050505" stroke="rgba(255,255,255,0.55)" strokeWidth="2" />
           <circle cx="100" cy="100" r="4" fill="white" />
         </svg>
-        <div className="pointer-events-none absolute inset-x-0 bottom-4 text-center">
-          <p className="text-4xl font-semibold leading-none text-white">{score}/100</p>
-          <p className={`mt-2 text-xs font-semibold uppercase tracking-[0.22em] ${labelClass}`}>{label}</p>
+        <div className="pointer-events-none absolute inset-x-0 bottom-5 text-center">
+          <p className={`text-sm font-semibold uppercase tracking-[0.24em] ${labelClass}`}>{label}</p>
         </div>
       </div>
       <div className="mt-3 grid grid-cols-3 gap-1 text-[10px] font-medium uppercase tracking-[0.12em] text-slate-500">
