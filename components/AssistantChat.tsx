@@ -18,6 +18,11 @@ interface LastSearchAction {
   topic: string;
 }
 
+interface ResultExclusions {
+  urls: string[];
+  titles: string[];
+}
+
 function getSearchAction(message: string): LastSearchAction | null {
   const trimmed = message.trim();
   const lower = trimmed.toLocaleLowerCase("tr-TR");
@@ -39,6 +44,7 @@ export function AssistantChat({ onDashboardData, initialMessages = [] }: Assista
   ]);
   const [input, setInput] = useState("");
   const [lastSearchAction, setLastSearchAction] = useState<LastSearchAction | null>(null);
+  const [resultExclusions, setResultExclusions] = useState<ResultExclusions>({ urls: [], titles: [] });
   const [isPending, startTransition] = useTransition();
 
   function sendMessage(nextInput = input) {
@@ -49,16 +55,26 @@ export function AssistantChat({ onDashboardData, initialMessages = [] }: Assista
     setMessages((current) => [...current, { role: "user", content }]);
     const nextSearchAction = getSearchAction(content);
     if (nextSearchAction?.topic) setLastSearchAction(nextSearchAction);
+    const isRefresh = /\b(yenile|yeniden|tekrar|refresh|başka|baska)\b/i.test(content);
 
     startTransition(async () => {
       try {
         const response = await fetch("/api/assistant", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: content }),
+          body: JSON.stringify({
+            message: content,
+            ...(isRefresh ? { excludeUrls: resultExclusions.urls, excludeTitles: resultExclusions.titles } : {}),
+          }),
         });
         const data = await response.json();
         if (data.dashboardData) {
+          const news = Array.isArray(data.dashboardData.finansHaberleri) ? data.dashboardData.finansHaberleri : [];
+          const suppliers = Array.isArray(data.dashboardData.tedarikLinkleri) ? data.dashboardData.tedarikLinkleri : [];
+          setResultExclusions({
+            urls: [...news.map((item: { url?: string }) => item.url).filter(Boolean), ...suppliers.map((item: { url?: string }) => item.url).filter(Boolean)] as string[],
+            titles: [...news.map((item: { title?: string }) => item.title).filter(Boolean), ...suppliers.map((item: { title?: string }) => item.title).filter(Boolean)] as string[],
+          });
           onDashboardData?.(data.dashboardData);
         }
         setMessages((current) => [...current, { role: "assistant", content: data.reply ?? "Şu anda yanıt üretilemedi." }]);

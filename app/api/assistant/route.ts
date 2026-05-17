@@ -5,6 +5,8 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 interface AssistantRequest {
   message?: string;
   userMessage?: string;
+  excludeUrls?: string[];
+  excludeTitles?: string[];
 }
 
 interface BudgetEntry {
@@ -227,6 +229,24 @@ function normalizeComparableUrl(url: string) {
 
 function normalizeComparableTitle(title: string) {
   return normalizeSearchText(title).replace(/\b(the|a|an|ve|ile|son|latest|news|haber)\b/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function titleSimilarity(a: string, b: string) {
+  const aTokens = new Set(normalizeComparableTitle(a).split(" ").filter((token) => token.length > 2));
+  const bTokens = new Set(normalizeComparableTitle(b).split(" ").filter((token) => token.length > 2));
+  if (aTokens.size === 0 || bTokens.size === 0) return 0;
+
+  const intersection = [...aTokens].filter((token) => bTokens.has(token)).length;
+  const union = new Set([...aTokens, ...bTokens]).size;
+  return intersection / union;
+}
+
+function isExcludedTitle(title: string, excludedTitles: string[]) {
+  const normalized = normalizeComparableTitle(title);
+  return excludedTitles.some((excluded) => {
+    const normalizedExcluded = normalizeComparableTitle(excluded);
+    return normalized === normalizedExcluded || normalized.includes(normalizedExcluded) || normalizedExcluded.includes(normalized) || titleSimilarity(title, excluded) >= 0.72;
+  });
 }
 
 function isRefreshRequest(message: string) {
@@ -660,13 +680,12 @@ async function fetchLiveNewsBundle(query: string, refresh = false, excludeUrls: 
   const normalizedQuery = normalizeQuery(query || "e-ticaret finans");
   const coreQuery = getCoreNewsQuery(query || "e-ticaret finans");
   const excludedUrlSet = new Set(excludeUrls.map(normalizeComparableUrl));
-  const excludedTitleSet = new Set(excludeTitles.map(normalizeComparableTitle));
   const responses = await fetchFirstSerpResults<SerpNewsResponse>(buildNewsSearchQueries(query, refresh));
   const allResults = uniqueBy(
     responses.flatMap((data) => data.news_results ?? [])
       .filter((item) => item.title && item.link)
       .filter((item) => !excludedUrlSet.has(normalizeComparableUrl(item.link ?? "")))
-      .filter((item) => !excludedTitleSet.has(normalizeComparableTitle(item.title ?? ""))),
+      .filter((item) => !isExcludedTitle(item.title ?? "", excludeTitles)),
     (item) => item.link ?? item.title ?? "",
   );
   const relevantResults = allResults
@@ -808,6 +827,8 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json()) as AssistantRequest;
     const message = (body.userMessage ?? body.message ?? "").trim();
+    const requestExcludeUrls = Array.isArray(body.excludeUrls) ? body.excludeUrls.filter((item) => typeof item === "string") : [];
+    const requestExcludeTitles = Array.isArray(body.excludeTitles) ? body.excludeTitles.filter((item) => typeof item === "string") : [];
 
     if (!message) {
       return NextResponse.json({ success: true, reply: commandHelp, dashboardData: null });
@@ -847,7 +868,12 @@ export async function POST(request: Request) {
       if (newsQuery) await rememberWatchTopic(supabase, userData.user.id, newsQuery, "news_watch");
       const normalizedText = normalizeQuery(newsQuery);
       const existingNewsForTopic = news.filter((item) => normalizeQuery(item.topic ?? "") === normalizedText);
-      const liveNews = await fetchLiveNewsBundle(newsQuery, refresh, refresh ? existingNewsForTopic.map((item) => item.url) : [], refresh ? existingNewsForTopic.map((item) => item.title) : []);
+      const liveNews = await fetchLiveNewsBundle(
+        newsQuery,
+        refresh,
+        refresh ? [...existingNewsForTopic.map((item) => item.url), ...requestExcludeUrls] : [],
+        refresh ? [...existingNewsForTopic.map((item) => item.title), ...requestExcludeTitles] : [],
+      );
       await persistLiveAgentResults({ signals: [], news: liveNews, suppliers: [] });
       news = refresh ? liveNews : [...liveNews, ...news.filter((item) => normalizeQuery(item.topic ?? "") === normalizedText)];
       signals = [];
@@ -862,7 +888,7 @@ export async function POST(request: Request) {
       if (productSearch.query) {
         const normalizedText = normalizeQuery(productSearch.query);
         const existingSuppliersForTopic = suppliers.filter((item) => normalizeQuery(item.product_name) === normalizedText);
-        const liveBundle = await fetchLiveProductBundle(productSearch.query, searchRegion, productSearch.scope, refresh, refresh ? existingSuppliersForTopic.map((item) => item.url) : []);
+        const liveBundle = await fetchLiveProductBundle(productSearch.query, searchRegion, productSearch.scope, refresh, refresh ? [...existingSuppliersForTopic.map((item) => item.url), ...requestExcludeUrls] : []);
         await persistLiveAgentResults(liveBundle);
         signals = refresh ? liveBundle.signals : [...liveBundle.signals, ...signals.filter((item) => normalizeQuery(item.product_name) === normalizedText)];
         suppliers = refresh ? liveBundle.suppliers : [...liveBundle.suppliers, ...suppliers.filter((item) => normalizeQuery(item.product_name) === normalizedText)];
