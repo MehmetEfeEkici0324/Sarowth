@@ -37,6 +37,33 @@ interface SupplierLink {
   score: number;
 }
 
+interface SerpShoppingResult {
+  title?: string;
+  link?: string;
+  product_link?: string;
+  source?: string;
+  price?: string;
+  extracted_price?: number;
+  rating?: number;
+}
+
+interface SerpNewsResult {
+  title?: string;
+  link?: string;
+  source?: string | { name?: string };
+  snippet?: string;
+}
+
+interface SerpShoppingResponse {
+  shopping_results?: SerpShoppingResult[];
+  error?: string;
+}
+
+interface SerpNewsResponse {
+  news_results?: SerpNewsResult[];
+  error?: string;
+}
+
 interface GeminiResponse {
   candidates?: Array<{
     content?: {
@@ -51,7 +78,7 @@ const commandHelp = `Ne yapmak istediğini kısa yazabilirsin.
 
 Alışveriş kararı: al tişört 6000
 Haber analizi: haber e-ticaret
-Ürün takibi: takip stres çarkı
+Ürün takibi: takip ürün adı
 Yatırım alanı: yatırım
 Bütçe özeti: özet
 
@@ -151,7 +178,7 @@ function buildTrackingReply(query: string, signals: MarketSignal[], suppliers: S
   const supplierItems = suppliers.filter((item) => `${item.product_name} ${item.title}`.toLocaleLowerCase("tr-TR").includes(query.toLocaleLowerCase("tr-TR"))).slice(0, 4);
 
   if (items.length === 0) {
-    return `Takip başlatıldı: ${query}\n\nPiyasa API bağlandığında bu ürünle ilgili trend, tedarik ve satış linkleri günlük olarak bundle halinde gösterilecek.`;
+    return `Takip başlatıldı: ${query}\n\nBu ürün için canlı veri bekleniyor. Agent çalıştığında trend, tedarik ve satış linkleri burada bundle olarak görünecek.`;
   }
 
   const supplierText = supplierItems.length > 0 ? `\n\nTedarik linkleri:\n${supplierItems.map((item) => `- ${item.title} (${item.source}${item.price_text ? `, ${item.price_text}` : ""})\n  ${item.url}`).join("\n")}` : "\n\nTedarik linkleri: Ürün tedarik API bağlanınca burada listelenecek.";
@@ -214,6 +241,73 @@ async function rememberWatchTopic(supabase: Awaited<ReturnType<typeof createSupa
     topic: normalizedTopic,
     intent,
   });
+}
+
+function getSerpNewsSource(source: SerpNewsResult["source"]) {
+  if (!source) return "Canlı Haber Agent";
+  if (typeof source === "string") return source;
+  return source.name ?? "Canlı Haber Agent";
+}
+
+function getLiveScore(index: number, item: SerpShoppingResult) {
+  const base = Math.max(58, 92 - index * 8);
+  const ratingBonus = item.rating ? Math.min(5, Math.round(item.rating)) : 0;
+  return Math.min(100, base + ratingBonus);
+}
+
+async function fetchSerpApi<T>(params: Record<string, string>) {
+  const apiKey = process.env.SERPAPI_API_KEY?.trim();
+  if (!apiKey) return null;
+
+  const url = new URL("https://serpapi.com/search.json");
+  Object.entries({ ...params, api_key: apiKey }).forEach(([key, value]) => url.searchParams.set(key, value));
+
+  try {
+    const response = await fetch(url, { cache: "no-store" });
+    const data = await response.json() as T & { error?: string };
+
+    if (!response.ok || data.error) {
+      console.error("SERPAPI_CHAT_AGENT_ERROR:", data.error ?? response.status);
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.error("SERPAPI_CHAT_AGENT_RUNTIME_ERROR:", error);
+    return null;
+  }
+}
+
+async function fetchLiveProductBundle(productName: string) {
+  const [shoppingData, newsData] = await Promise.all([
+    fetchSerpApi<SerpShoppingResponse>({ engine: "google_shopping", q: `${productName} tedarik satın al`, gl: "tr", hl: "tr" }),
+    fetchSerpApi<SerpNewsResponse>({ engine: "google_news", q: `${productName} trend haber e-ticaret`, gl: "tr", hl: "tr" }),
+  ]);
+
+  const shoppingResults = (shoppingData?.shopping_results ?? []).filter((item) => item.title && (item.link || item.product_link)).slice(0, 6);
+  const newsResults = (newsData?.news_results ?? []).filter((item) => item.title && item.link).slice(0, 4);
+  const suppliers: SupplierLink[] = shoppingResults.map((item, index) => ({
+    product_name: productName,
+    title: item.title as string,
+    url: (item.link ?? item.product_link) as string,
+    source: item.source ?? "Google Shopping",
+    price_text: item.price ?? (item.extracted_price ? `₺${item.extracted_price}` : null),
+    score: getLiveScore(index, item),
+  }));
+  const signals: MarketSignal[] = shoppingResults.length > 0 ? [{
+    product_name: productName,
+    signal: `${shoppingResults.length} canlı tedarik sonucu bulundu. En güçlü kaynak: ${suppliers[0]?.source ?? "Google Shopping"}${suppliers[0]?.price_text ? `, fiyat: ${suppliers[0].price_text}` : ""}.`,
+    score: suppliers[0]?.score ?? 70,
+    source_url: suppliers[0]?.url,
+  }] : [];
+  const news: NewsItem[] = newsResults.map((item) => ({
+    title: item.title as string,
+    source: getSerpNewsSource(item.source),
+    url: item.link as string,
+    summary: item.snippet ?? `${productName} için canlı haber sinyali.`,
+  }));
+
+  return { signals, suppliers, news };
 }
 
 async function generateGeminiReply({
@@ -317,9 +411,9 @@ export async function POST(request: Request) {
     ]);
 
     const entries = (budgetEntries ?? []) as BudgetEntry[];
-    const signals = (marketSignals ?? []) as MarketSignal[];
-    const news = (financeNews ?? []) as NewsItem[];
-    const suppliers = (supplierLinks ?? []) as SupplierLink[];
+    let signals = (marketSignals ?? []) as MarketSignal[];
+    let news = (financeNews ?? []) as NewsItem[];
+    let suppliers = (supplierLinks ?? []) as SupplierLink[];
     const summary = buildBudgetSummary(entries);
     const { command, text } = parseCommand(message);
     const amount = parseAmount(text);
@@ -333,7 +427,13 @@ export async function POST(request: Request) {
       localReply = buildNewsReply(text, news);
     } else if (command === "takip") {
       if (text) await rememberWatchTopic(supabase, userData.user.id, text, "product_watch");
-      localReply = text ? buildTrackingReply(text, signals, suppliers) : "Takip etmek istediğin ürünü yaz. Örnek: takip stres çarkı";
+      if (text) {
+        const liveBundle = await fetchLiveProductBundle(text);
+        signals = [...liveBundle.signals, ...signals];
+        suppliers = [...liveBundle.suppliers, ...suppliers];
+        news = [...liveBundle.news, ...news];
+      }
+      localReply = text ? buildTrackingReply(text, signals, suppliers) : "Takip etmek istediğin ürünü yaz. Örnek: takip ürün adı";
     } else if (command === "yatirim") {
       await rememberWatchTopic(supabase, userData.user.id, "yatırım fırsatları", "investment_watch");
       localReply = buildInvestmentReply(summary);

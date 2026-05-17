@@ -62,7 +62,7 @@ async function fetchSerpApi<T>(params: Record<string, string>) {
   const url = new URL("https://serpapi.com/search.json");
   Object.entries({ ...params, api_key: apiKey }).forEach(([key, value]) => url.searchParams.set(key, value));
 
-  const response = await fetch(url, { next: { revalidate: 3600 } });
+  const response = await fetch(url, { cache: "no-store" });
   const data = await response.json() as T & { error?: string };
 
   if (!response.ok || data.error) {
@@ -76,14 +76,21 @@ async function syncTopic(topic: WatchTopic) {
   const supabase = createSupabaseAdminClient();
   const shoppingQuery = `${topic.topic} tedarik satın al`;
   const newsQuery = `${topic.topic} haber trend e-ticaret`;
+  const errors: string[] = [];
 
-  const [shoppingData, newsData] = await Promise.all([
+  const [shoppingResult, newsResult] = await Promise.allSettled([
     fetchSerpApi<SerpShoppingResponse>({ engine: "google_shopping", q: shoppingQuery, gl: "tr", hl: "tr" }),
     fetchSerpApi<SerpNewsResponse>({ engine: "google_news", q: newsQuery, gl: "tr", hl: "tr" }),
   ]);
 
-  const shoppingResults = (shoppingData.shopping_results ?? []).filter((item) => item.title && item.link).slice(0, 6);
-  const newsResults = (newsData.news_results ?? []).filter((item) => item.title && item.link).slice(0, 4);
+  const shoppingData = shoppingResult.status === "fulfilled" ? shoppingResult.value : null;
+  const newsData = newsResult.status === "fulfilled" ? newsResult.value : null;
+
+  if (shoppingResult.status === "rejected") errors.push(`shopping: ${shoppingResult.reason instanceof Error ? shoppingResult.reason.message : String(shoppingResult.reason)}`);
+  if (newsResult.status === "rejected") errors.push(`news: ${newsResult.reason instanceof Error ? newsResult.reason.message : String(newsResult.reason)}`);
+
+  const shoppingResults = (shoppingData?.shopping_results ?? []).filter((item) => item.title && item.link).slice(0, 6);
+  const newsResults = (newsData?.news_results ?? []).filter((item) => item.title && item.link).slice(0, 4);
 
   if (shoppingResults.length > 0) {
     const supplierRows = shoppingResults.map((item, index) => ({
@@ -129,6 +136,7 @@ async function syncTopic(topic: WatchTopic) {
     topic: topic.topic,
     suppliers: shoppingResults.length,
     news: newsResults.length,
+    errors,
   };
 }
 
@@ -137,9 +145,17 @@ async function handle(request: Request) {
     return NextResponse.json({ error: "Yetkisiz intelligence agent isteği." }, { status: 401 });
   }
 
-  const runId = await startAgentRun("intelligence", "Kullanıcı takip konuları için SerpAPI haber, trend ve tedarik senkronizasyonu.");
+  if (!process.env.SERPAPI_API_KEY?.trim()) {
+    return NextResponse.json({
+      success: false,
+      error: "SERPAPI_API_KEY Vercel ortam değişkenlerinde bulunamadı veya boş.",
+    }, { status: 500 });
+  }
+
+  let runId: string | undefined;
 
   try {
+    runId = await startAgentRun("intelligence", "Kullanıcı takip konuları için SerpAPI haber, trend ve tedarik senkronizasyonu.");
     const supabase = createSupabaseAdminClient();
     const { data: topics, error } = await supabase.from("agent_watch_topics").select("id, user_id, topic, intent").eq("status", "active").order("last_checked_at", { ascending: true, nullsFirst: true }).limit(10);
 
@@ -152,8 +168,9 @@ async function handle(request: Request) {
       results.push(await syncTopic(topic));
     }
 
-    await finishAgentRun(runId, "success", `${results.length} konu işlendi.`);
-    return NextResponse.json({ success: true, processed: results.length, results });
+    const partialErrors = results.flatMap((result) => result.errors.map((error) => `${result.topic}: ${error}`));
+    await finishAgentRun(runId, partialErrors.length > 0 ? "error" : "success", `${results.length} konu işlendi.`, partialErrors.join(" | ") || undefined);
+    return NextResponse.json({ success: partialErrors.length === 0, processed: results.length, results, errors: partialErrors });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Intelligence agent çalıştırılamadı.";
     console.error("INTELLIGENCE_AGENT_ERROR:", error);

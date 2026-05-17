@@ -95,7 +95,7 @@ function AgentMarketSection({ marketSignals }: { marketSignals: MarketSignal[] }
         <h2 className="text-2xl font-semibold tracking-[-0.03em]">Piyasada yükselen ürünler</h2>
       </div>
       <div className="mt-5 grid gap-3">
-        {marketSignals.map((item) => (
+        {marketSignals.length > 0 ? marketSignals.map((item) => (
           <div key={item.name} className="rounded-2xl border border-white/10 bg-black/25 p-4">
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -106,7 +106,12 @@ function AgentMarketSection({ marketSignals }: { marketSignals: MarketSignal[] }
             </div>
             <p className="mt-3 text-xs text-slate-500">Kaynak: {item.source}. Agent bundle yanıtıyla anlık güncellenir.</p>
           </div>
-        ))}
+        )) : (
+          <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-5">
+            <p className="font-medium text-white">Ürün bekleniyor</p>
+            <p className="mt-2 text-sm leading-6 text-slate-400">Chatte <span className="text-emerald-200">takip ürün adı</span> yazınca SerpAPI canlı tedarik ve trend sonuçları burada görünür.</p>
+          </div>
+        )}
       </div>
     </section>
   );
@@ -120,7 +125,7 @@ function AgentNewsSection({ financeNews }: { financeNews: FinanceNewsItem[] }) {
         <h2 className="text-2xl font-semibold tracking-[-0.03em]">Finans ve e-ticaret haberleri</h2>
       </div>
       <div className="mt-5 grid gap-3">
-        {financeNews.map((news) => (
+        {financeNews.length > 0 ? financeNews.map((news) => (
           <article key={news.title} className="group rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:border-blue-400/30">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0 flex-1">
@@ -141,7 +146,12 @@ function AgentNewsSection({ financeNews }: { financeNews: FinanceNewsItem[] }) {
               </a>
             </div>
           </article>
-        ))}
+        )) : (
+          <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-5">
+            <p className="font-medium text-white">Haber bundle bekleniyor</p>
+            <p className="mt-2 text-sm leading-6 text-slate-400">Chatte <span className="text-blue-200">haber konu</span> veya <span className="text-blue-200">takip ürün adı</span> yazınca canlı haber sinyalleri burada listelenir.</p>
+          </div>
+        )}
       </div>
     </section>
   );

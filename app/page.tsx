@@ -19,17 +19,9 @@ interface AuthenticatedHomeProps {
   financeNews: Array<{ title: string; source: string; href: string; time?: string; bundleSummary?: string }>;
 }
 
-const defaultMarketSignals = [
-  { name: "Katlanabilir seyahat çantası", signal: "Kısa video içeriklerinde tekrar eden talep", score: 87, source: "Trend Agent" },
-  { name: "Mini masa süpürgesi", signal: "Ev/ofis düzeni içeriklerinde yükseliyor", score: 81, source: "Piyasa Agent" },
-  { name: "Soğuk kahve başlangıç seti", signal: "Sezon öncesi arama hacmi güçleniyor", score: 76, source: "Ürün Agent" },
-];
+const defaultMarketSignals: Array<{ name: string; signal: string; score: number; source: string }> = [];
 
-const defaultFinanceNews = [
-  { title: "E-ticarette mikro stok yönetimi daha kritik hale geliyor", source: "Finans Haber Agent", href: "https://bloomberght.com", time: "10 dk önce", bundleSummary: "AJAN NOTU: Genel piyasa sinyali olumlu, az stoklu e-ticaret modelleri denenebilir." },
-  { title: "KOBİ'ler için dijital ödeme maliyetleri yakından izleniyor", source: "Piyasa Haber Agent", href: "https://reuters.com", time: "1 saat önce", bundleSummary: "AJAN NOTU: Sanal pos komisyonları %3.5 bandına dayandı. Ticari ödemelerde nakit akışını korumak kritik." },
-  { title: "Tüketici ilgisi düşük fiyatlı pratik ürünlere kayıyor", source: "Trend Haber Agent", href: "https://trendhunter.com", time: "2 saat önce", bundleSummary: "AJAN NOTU: Düşük fiyatlı pratik ürünlerde test bütçesiyle ilerlemek daha güvenli." },
-];
+const defaultFinanceNews: Array<{ title: string; source: string; href: string; time?: string; bundleSummary?: string }> = [];
 
 const investmentIdeas = [
   "Geçen ay oluşan tasarrufun bir kısmı ürün testi bütçesi olarak ayrılabilir.",

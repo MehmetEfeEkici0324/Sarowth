@@ -16,7 +16,7 @@ export function AssistantChat({ onDashboardData }: AssistantChatProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      content: "Bana normal cümleyle de yazabilirsin. Örnek: al tişört 6000",
+      content: "Bana normal cümleyle yazabilirsin. Ürün takibi için ürün adını sen girene kadar beklerim.",
     },
   ]);
   const [input, setInput] = useState("");
@@ -59,9 +59,9 @@ export function AssistantChat({ onDashboardData }: AssistantChatProps) {
 
       <div className="mt-5 grid gap-3 lg:grid-cols-5">
         {[
-          { label: "Almalı mıyım?", prompt: "al tişört 6000", detail: "Bütçeye göre karar" },
+          { label: "Almalı mıyım?", prompt: "al ürün 6000", detail: "Bütçeye göre karar" },
           { label: "Haber ara", prompt: "haber e-ticaret", detail: "Günlük haber bundle" },
-          { label: "Ürün takip", prompt: "takip stres çarkı", detail: "Trend ve tedarik" },
+          { label: "Ürün takip", prompt: "takip ürün adı", detail: "Trend ve tedarik" },
           { label: "Yatırım alanı", prompt: "yatırım", detail: "Tavsiye değildir" },
           { label: "Bütçe özeti", prompt: "özet", detail: "Gelir gider durumu" },
         ].map((item) => (
@@ -91,7 +91,7 @@ export function AssistantChat({ onDashboardData }: AssistantChatProps) {
               sendMessage();
             }
           }}
-          placeholder="Örn: al tişört 6000 veya haber e-ticaret"
+          placeholder="Örn: al ürün 6000 veya takip ürün adı"
           className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none placeholder:text-slate-500 focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-400/10"
         />
         <button type="button" onClick={() => sendMessage()} disabled={isPending} className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-emerald-400 to-blue-500 px-5 py-3 font-semibold text-[#03110c] disabled:opacity-60">
