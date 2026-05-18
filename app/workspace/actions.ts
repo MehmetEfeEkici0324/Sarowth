@@ -40,14 +40,16 @@ export async function updateProfile(formData: FormData) {
 
 export async function addBudgetEntry(formData: FormData) {
   const { supabase, user } = await getWorkspace();
-  const label = String(formData.get("label") ?? "").trim();
+  const rawLabel = String(formData.get("label") ?? "").trim();
   const category = String(formData.get("category") ?? "").trim();
   const entryType = String(formData.get("entryType") ?? "expense");
   const amount = Number(formData.get("amount") ?? 0);
 
-  if (!label || !allowedBudgetCategories[entryType]?.includes(category) || !Number.isFinite(amount) || amount <= 0) {
+  if (!allowedBudgetCategories[entryType]?.includes(category) || !Number.isFinite(amount) || amount <= 0) {
     return;
   }
+
+  const label = rawLabel || category;
 
   const { error } = await supabase.from("budget_entries").insert({
     user_id: user.id,

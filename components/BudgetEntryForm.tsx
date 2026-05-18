@@ -84,7 +84,10 @@ export function BudgetEntryForm() {
         </div>
       </div>
 
-      <input name="label" placeholder="Kayıt adı: örn. Mayıs maaşı, ayakkabı, kira" className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-400/10" />
+      <div className="grid gap-2">
+        <p className="rounded-2xl border border-emerald-300/15 bg-emerald-400/10 px-4 py-3 text-sm leading-6 text-emerald-50">Kayıt ön adı yazılmaz ise seçilen kategorinin isminde kayıt oluşturulur.</p>
+        <input name="label" placeholder="Kayıt adı: örn. Mayıs maaşı, ayakkabı, kira" className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-400/10" />
+      </div>
       <input name="amount" type="number" min="0" step="0.01" placeholder="Tutar" className="rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none focus:border-blue-400/60 focus:ring-4 focus:ring-blue-400/10" />
       <FormSubmit idleLabel="Kaydet" />
     </form>
