@@ -168,14 +168,6 @@ function AuthenticatedHome({ userName, profile, budgetEntries, ideas, marketSign
             </div>
           </div>
 
-          <section id="how-it-works" className="mt-6 rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl sm:p-8">
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-              <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-300">Sarowth nedir?</p>
-              <h2 className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-300">Nasıl Çalışır?</h2>
-            </div>
-            <p className="mt-5 max-w-3xl text-lg leading-8 text-slate-300">Sarowth size kişisel finansmanlık yapan; e-ticaret, hisse-coin alım satımlarınıza fikir veren, Gemini destekli bir arkadaştır.</p>
-          </section>
-
           <section id="agents" className="mt-6 rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl sm:p-8">
             <div className="flex items-center gap-3">
               <PlugZap className="text-emerald-300" size={22} />
@@ -228,6 +220,39 @@ function AuthenticatedHome({ userName, profile, budgetEntries, ideas, marketSign
             <InvestmentSection income={income} expenses={expenses} savings={savings} topExpense={topExpense} marketSignals={marketSignals} />
             <CommerceAgentPanel ideas={ideas} marketSignals={marketSignals} availableCapital={cycleCapital} />
           </div>
+
+          <section id="how-it-works" className="mt-6 rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl sm:p-8">
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+              <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-300">Sarowth nedir?</p>
+              <h2 className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-300">Nasıl Çalışır?</h2>
+            </div>
+            <div className="mt-6 grid gap-5 text-sm leading-7 text-slate-300 md:grid-cols-2">
+              <div>
+                <h3 className="font-semibold text-white">Sarowth nedir?</h3>
+                <p className="mt-2">Sarowth, gelir-gider kayıtlarını, piyasa haberlerini, ürün trendlerini ve yatırım gündemini tek yerde toplayan Gemini destekli kişisel karar asistanıdır.</p>
+              </div>
+              <div>
+                <h3 className="font-semibold text-white">Nasıl çalışır?</h3>
+                <p className="mt-2">Önce bütçe paneline gelir, gider ve birikim kayıtlarını eklersin. Asistana soru yazdığında Sarowth bütçeni, haberleri ve trend sonuçlarını birlikte yorumlar.</p>
+              </div>
+              <div>
+                <h3 className="font-semibold text-white">Bütçe takibi</h3>
+                <p className="mt-2">Gelirlerini, giderlerini ve birikimlerini kategori bazlı kaydedebilirsin. Böylece asistan satın alma kararlarında gerçek bütçe durumunu dikkate alır.</p>
+              </div>
+              <div>
+                <h3 className="font-semibold text-white">Piyasa ve ürün takibi</h3>
+                <p className="mt-2"><span className="text-emerald-200">takip &lt;ürün&gt;</span> yazarak bir ürünün piyasa sinyallerini, trend durumunu ve tedarik bağlantılarını takip edebilirsin.</p>
+              </div>
+              <div>
+                <h3 className="font-semibold text-white">Haber ve yatırım gündemi</h3>
+                <p className="mt-2"><span className="text-blue-200">haber &lt;ürün&gt;</span> veya <span className="text-blue-200">haber &lt;hisse/coin&gt;</span> yazarak finans ve e-ticaret haberlerini aratabilirsin. Bu bilgiler yatırım tavsiyesi değildir.</p>
+              </div>
+              <div>
+                <h3 className="font-semibold text-white">Gemini asistan</h3>
+                <p className="mt-2">“Bu ürünü almalı mıyım?”, “Bütçem uygun mu?” veya “Bu ay neye dikkat etmeliyim?” gibi sorularda bütçeni ve güncel sinyalleri birlikte değerlendirir.</p>
+              </div>
+            </div>
+          </section>
 
         </div>
       </section>
