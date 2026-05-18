@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { RefreshCw, Send } from "lucide-react";
+import { RefreshCw, Send, Trash2 } from "lucide-react";
+import { clearAssistantMessages } from "@/app/workspace/actions";
 
 interface Message {
   role: "user" | "assistant";
@@ -31,6 +32,12 @@ interface AssistantDashboardData {
 const refreshPattern = /\b(yenile|yeniden|tekrar|refresh|başka|baska)\b/gi;
 const newsPrefixes = ["haber ", "haberleri ", "gündem ", "piyasa haberi "];
 const productPrefixes = ["takip ", "izle ", "ürün takip ", "ürün ara ", "urun takip ", "urun ara ", "tedarik "];
+const defaultAssistantMessages: Message[] = [
+  {
+    role: "assistant",
+    content: "Bana normal cümleyle yazabilirsin. Ürün takibi için ürün adını sen girene kadar beklerim.",
+  },
+];
 
 function stripRefreshWords(value: string) {
   return value.replace(refreshPattern, "").trim();
@@ -62,12 +69,7 @@ function getSearchAction(message: string): LastSearchAction | null {
 }
 
 export function AssistantChat({ onDashboardData, initialMessages = [] }: AssistantChatProps) {
-  const [messages, setMessages] = useState<Message[]>(initialMessages.length > 0 ? initialMessages : [
-    {
-      role: "assistant",
-      content: "Bana normal cümleyle yazabilirsin. Ürün takibi için ürün adını sen girene kadar beklerim.",
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>(initialMessages.length > 0 ? initialMessages : defaultAssistantMessages);
   const [input, setInput] = useState("");
   const [lastSearchAction, setLastSearchAction] = useState<LastSearchAction | null>(null);
   const [resultExclusions, setResultExclusions] = useState<ResultExclusions>({ urls: [], titles: [] });
@@ -102,6 +104,15 @@ export function AssistantChat({ onDashboardData, initialMessages = [] }: Assista
       } catch {
         setMessages((current) => [...current, { role: "assistant", content: "Bağlantı kurulamadı. Biraz sonra tekrar deneyebilirsin." }]);
       }
+    });
+  }
+
+  function clearConversations() {
+    startTransition(async () => {
+      await clearAssistantMessages();
+      setMessages(defaultAssistantMessages);
+      setLastSearchAction(null);
+      setResultExclusions({ urls: [], titles: [] });
     });
   }
 
@@ -147,6 +158,14 @@ export function AssistantChat({ onDashboardData, initialMessages = [] }: Assista
               <RefreshCw size={15} /> {lastSearchAction.command === "haber" ? "Haberleri yenile" : "Ürün sonuçlarını yenile"}
             </button>
             <span className="rounded-full border border-white/10 bg-black/20 px-4 py-2 text-xs text-slate-500">Yeni sonuçlar önceki linkler hariç aranır.</span>
+            <button
+              type="button"
+              onClick={clearConversations}
+              disabled={isPending}
+              className="inline-flex items-center gap-2 rounded-full border border-rose-300/20 bg-rose-400/10 px-4 py-2 text-sm font-medium text-rose-100 transition hover:border-rose-300/40 disabled:opacity-60"
+            >
+              <Trash2 size={15} /> Asistan konuşmalarını temizle
+            </button>
           </div>
         </div>
       ) : null}

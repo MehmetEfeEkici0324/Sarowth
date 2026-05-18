@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getWorkspace } from "@/lib/auth";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 const allowedBudgetCategories: Record<string, string[]> = {
   income: ["Maaş", "Ek iş", "Satış geliri", "İade", "Diğer gelir"],
@@ -63,6 +64,15 @@ export async function addBudgetEntry(formData: FormData) {
 
   revalidatePath("/budget");
   revalidatePath("/dashboard");
+  revalidatePath("/");
+}
+
+export async function clearAssistantMessages() {
+  const { user } = await getWorkspace();
+  const supabaseAdmin = createSupabaseAdminClient();
+
+  await supabaseAdmin.from("assistant_messages").delete().eq("user_id", user.id);
+
   revalidatePath("/");
 }
 

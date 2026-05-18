@@ -147,6 +147,7 @@ drop policy if exists "Users can read own cycle events" on public.agent_cycle_ev
 drop policy if exists "Users can insert own cycle events" on public.agent_cycle_events;
 drop policy if exists "Users can read own assistant messages" on public.assistant_messages;
 drop policy if exists "Users can insert own assistant messages" on public.assistant_messages;
+drop policy if exists "Users can delete own assistant messages" on public.assistant_messages;
 drop policy if exists "Users can read own watch topics" on public.agent_watch_topics;
 drop policy if exists "Users can insert own watch topics" on public.agent_watch_topics;
 drop policy if exists "Users can update own watch topics" on public.agent_watch_topics;
@@ -213,6 +214,10 @@ using (auth.uid() = user_id);
 create policy "Users can insert own assistant messages"
 on public.assistant_messages for insert
 with check (auth.uid() = user_id);
+
+create policy "Users can delete own assistant messages"
+on public.assistant_messages for delete
+using (auth.uid() = user_id);
 
 create policy "Users can read own watch topics"
 on public.agent_watch_topics for select
