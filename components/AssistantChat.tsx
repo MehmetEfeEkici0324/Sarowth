@@ -157,7 +157,6 @@ export function AssistantChat({ onDashboardData, initialMessages = [] }: Assista
             >
               <RefreshCw size={15} /> {lastSearchAction.command === "haber" ? "Haberleri yenile" : "Ürün sonuçlarını yenile"}
             </button>
-            <span className="rounded-full border border-white/10 bg-black/20 px-4 py-2 text-xs text-slate-500">Yeni sonuçlar önceki linkler hariç aranır.</span>
             <button
               type="button"
               onClick={clearConversations}
@@ -166,6 +165,7 @@ export function AssistantChat({ onDashboardData, initialMessages = [] }: Assista
             >
               <Trash2 size={15} /> Asistan konuşmalarını temizle
             </button>
+            <span className="rounded-full border border-white/10 bg-black/20 px-4 py-2 text-xs text-slate-500">Yeni sonuçlar önceki linkler hariç aranır.</span>
           </div>
         </div>
       ) : null}
