@@ -111,6 +111,10 @@ export function AssistantChat({ onDashboardData, initialMessages = [] }: Assista
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-300">Kişisel Asistan</p>
           <h2 className="mt-2 text-3xl font-semibold tracking-[-0.04em]">Gemini destekli kişisel karar asistanı</h2>
+          <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-400">
+            <span className="rounded-full border border-emerald-300/20 bg-black/20 px-4 py-2">Piyasa ürünleri takibi için: <span className="text-emerald-200">takip &lt;ürün&gt;</span></span>
+            <span className="rounded-full border border-blue-300/20 bg-black/20 px-4 py-2">Hisse, yatırım ürünleri takibi için: <span className="text-blue-200">haber &lt;ürün&gt;</span></span>
+          </div>
         </div>
         <p className="max-w-md text-sm leading-6 text-slate-400">Bütçe kayıtlarını okur, haber/trend tablolarını kontrol eder ve sadece mesaj gönderdiğinde çalışır.</p>
       </div>
@@ -143,10 +147,6 @@ export function AssistantChat({ onDashboardData, initialMessages = [] }: Assista
               <RefreshCw size={15} /> {lastSearchAction.command === "haber" ? "Haberleri yenile" : "Ürün sonuçlarını yenile"}
             </button>
             <span className="rounded-full border border-white/10 bg-black/20 px-4 py-2 text-xs text-slate-500">Yeni sonuçlar önceki linkler hariç aranır.</span>
-          </div>
-          <div className="flex flex-wrap gap-2 text-xs text-slate-400">
-            <span className="rounded-full border border-emerald-300/20 bg-black/20 px-4 py-2">Piyasa ürünleri takibi için: <span className="text-emerald-200">takip &lt;ürün&gt;</span></span>
-            <span className="rounded-full border border-blue-300/20 bg-black/20 px-4 py-2">Hisse, yatırım ürünleri takibi için: <span className="text-blue-200">haber &lt;ürün&gt;</span></span>
           </div>
         </div>
       ) : null}
