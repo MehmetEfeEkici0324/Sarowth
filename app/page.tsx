@@ -170,7 +170,8 @@ function AuthenticatedHome({ userName, profile, budgetEntries, ideas, marketSign
 
           <section id="how-it-works" className="mt-6 rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl sm:p-8">
             <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-300">Sarowth nedir?</p>
-            <h2 className="mt-4 text-3xl font-semibold tracking-[-0.04em] text-white">Nasıl Çalışır?</h2>
+            <h2 className="mt-3 text-sm font-semibold uppercase tracking-[0.3em] text-emerald-300">Nasıl Çalışır?</h2>
+            <p className="mt-5 max-w-3xl text-lg leading-8 text-slate-300">Sarowth size kişisel finansmanlık yapan; e-ticaret, hisse-coin alım satımlarınıza fikir veren, Gemini destekli bir arkadaştır.</p>
           </section>
 
           <section id="agents" className="mt-6 rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl sm:p-8">
