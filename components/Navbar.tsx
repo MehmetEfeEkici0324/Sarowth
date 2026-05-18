@@ -42,7 +42,10 @@ export function Navbar({ links = defaultLinks, userName }: NavbarProps) {
           <span className="grid h-9 w-9 place-items-center rounded-2xl border border-emerald-400/40 bg-emerald-400/10 shadow-[0_0_35px_rgba(16,185,129,0.2)]">
             <span className="h-3 w-3 rounded-full bg-emerald-400 shadow-[0_0_18px_rgba(16,185,129,0.9)]" />
           </span>
-          <span className="text-lg font-semibold tracking-[0.28em] text-white">SAROWTH</span>
+          <span className="flex min-w-0 flex-col leading-none">
+            <span className="text-lg font-semibold tracking-[0.28em] text-white">SAROWTH</span>
+            <span className="mt-1 text-[0.65rem] font-semibold italic tracking-[0.18em] text-transparent bg-clip-text bg-gradient-to-r from-emerald-200 via-cyan-200 to-blue-300">Save&Growth</span>
+          </span>
         </a>
 
         <div className={cn("hidden items-center md:flex", isSignedIn ? "gap-2" : "gap-8")}>
