@@ -158,6 +158,7 @@ function AuthenticatedHome({ userName, profile, budgetEntries, ideas, marketSign
               <div className="mt-7 flex flex-col gap-3 sm:flex-row">
                 <a href="#assistant" className="rounded-full bg-gradient-to-r from-emerald-400 to-blue-500 px-6 py-3 text-center font-semibold text-[#03110c]">Asistana Sor</a>
                 <a href="#agents" className="rounded-full border border-white/10 bg-white/[0.04] px-6 py-3 text-center font-semibold text-white transition hover:bg-white/10">Agent Durumlarını Gör</a>
+                <a href="#how-it-works" className="rounded-full border border-blue-300/20 bg-blue-400/10 px-6 py-3 text-center font-semibold text-blue-50 transition hover:border-blue-300/40 hover:bg-blue-400/15">Nasıl Çalışır?</a>
               </div>
             </div>
             <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-1">
@@ -166,6 +167,11 @@ function AuthenticatedHome({ userName, profile, budgetEntries, ideas, marketSign
               <StatCard label="En yüksek harcama" value={topExpense ? topExpense[0] : "Yok"} detail={topExpense ? `₺${topExpense[1].toLocaleString("tr-TR")} harcama görünüyor.` : "Bütçe verisi bekleniyor."} />
             </div>
           </div>
+
+          <section id="how-it-works" className="mt-6 rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl sm:p-8">
+            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-emerald-300">Sarowth nedir?</p>
+            <h2 className="mt-4 text-3xl font-semibold tracking-[-0.04em] text-white">Nasıl Çalışır?</h2>
+          </section>
 
           <section id="agents" className="mt-6 rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl sm:p-8">
             <div className="flex items-center gap-3">
