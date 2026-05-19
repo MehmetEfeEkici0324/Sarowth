@@ -67,6 +67,21 @@ export async function addBudgetEntry(formData: FormData) {
   revalidatePath("/");
 }
 
+export async function deleteBudgetEntry(formData: FormData) {
+  const { supabase, user } = await getWorkspace();
+  const entryId = String(formData.get("entryId") ?? "").trim();
+
+  if (!entryId) return;
+
+  const { error } = await supabase.from("budget_entries").delete().eq("id", entryId).eq("user_id", user.id);
+
+  if (error) return;
+
+  revalidatePath("/budget");
+  revalidatePath("/dashboard");
+  revalidatePath("/");
+}
+
 export async function clearAssistantMessages() {
   const { user } = await getWorkspace();
   const supabaseAdmin = createSupabaseAdminClient();

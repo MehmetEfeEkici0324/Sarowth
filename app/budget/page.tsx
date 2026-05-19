@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { Trash2 } from "lucide-react";
+import { deleteBudgetEntry } from "@/app/workspace/actions";
 import { AppShell } from "@/components/AppShell";
 import { BudgetEntryForm } from "@/components/BudgetEntryForm";
 import { StatCard } from "@/components/StatCard";
@@ -43,7 +45,15 @@ export default async function BudgetPage({}: BudgetPageProps) {
                   <p className="font-medium text-white">{entry.label}</p>
                   <p className="mt-1 text-sm text-slate-500">{entry.category} · {entryTypeLabels[entry.entry_type] ?? entry.entry_type}</p>
                 </div>
-                <p className="font-mono text-lg font-semibold">₺{Number(entry.amount).toLocaleString()}</p>
+                <div className="flex items-center gap-3">
+                  <p className="font-mono text-lg font-semibold">₺{Number(entry.amount).toLocaleString()}</p>
+                  <form action={deleteBudgetEntry}>
+                    <input type="hidden" name="entryId" value={entry.id} />
+                    <button type="submit" className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-rose-300/20 bg-rose-400/10 text-rose-100 transition hover:border-rose-300/40 hover:bg-rose-400/15" aria-label={`${entry.label} kaydını sil`}>
+                      <Trash2 size={16} />
+                    </button>
+                  </form>
+                </div>
               </div>
             )) : <p className="rounded-2xl border border-white/10 bg-black/25 p-4 leading-7 text-slate-400">Henüz kayıt yok. Önce gelirini, sonra düzenli giderlerini ekle; chat asistanı kararlarını buna göre hesaplayacak.</p>}
           </div>
